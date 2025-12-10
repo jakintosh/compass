@@ -1,0 +1,27 @@
+package main
+
+import (
+	"log"
+	"net/http"
+
+	"git.sr.ht/~jakintosh/todo/internal/store"
+	"git.sr.ht/~jakintosh/todo/internal/web"
+)
+
+func main() {
+	// Initialize Store
+	s, err := store.NewSQLiteStore("todo.db")
+	if err != nil {
+		log.Fatalf("Failed to initialize store: %v", err)
+	}
+	s.Seed() // Add dummy data if empty
+
+	// Initialize Web Server
+	srv := web.NewServer(s)
+
+	// Start Server
+	log.Println("Starting server on :8080...")
+	if err := http.ListenAndServe(":8080", srv); err != nil {
+		log.Fatalf("Server failed: %v", err)
+	}
+}

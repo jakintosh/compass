@@ -1,0 +1,100 @@
+{{define "content"}}
+<div class="app">
+    <header class="app-header">
+        <h1 class="app-title">vibes todo</h1>
+        <button class="btn btn-add" hx-post="/categories" hx-target="#categories-list" hx-swap="beforeend">
+            <span>New Category</span>
+            <span class="arrow">+</span>
+        </button>
+    </header>
+
+    <div id="categories-list" class="content-scroll categories-list">
+        {{range .Categories}}
+        {{template "category" .}}
+        {{end}}
+    </div>
+</div>
+{{end}}
+
+{{define "category"}}
+<div class="category" id="category-{{.ID}}" data-id="{{.ID}}">
+    <div class="category-header">
+        <div class="category-header-left">
+            <button class="btn category-toggle {{if .Collapsed}}collapsed{{end}}"
+                hx-patch="/categories/{{.ID}}/toggle-collapse" hx-target="#category-{{.ID}}" hx-swap="outerHTML">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
+            </button>
+
+            <div class="category-info">
+                <h2 class="category-name">{{.Name}}</h2>
+                <span class="category-meta">{{.AverageCompletion}}% complete</span>
+            </div>
+        </div>
+
+        <div class="category-actions">
+            <button class="btn drag-handle handle">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="3" y1="12" x2="21" y2="12"></line>
+                    <line x1="3" y1="6" x2="21" y2="6"></line>
+                    <line x1="3" y1="18" x2="21" y2="18"></line>
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    <div class="tasks-list {{if .Collapsed}}hidden{{end}}" data-category-id="{{.ID}}">
+        {{range .Tasks}}
+        {{template "task" .}}
+        {{end}}
+
+        <div class="tasks-footer">
+            <button class="btn btn-add" hx-post="/categories/{{.ID}}/tasks" hx-target="#category-{{.ID}} .tasks-list"
+                hx-swap="beforeend">
+                <span class="arrow">→</span>
+                <span>Add a task</span>
+            </button>
+        </div>
+    </div>
+</div>
+{{end}}
+
+{{define "task"}}
+<div class="task" id="task-{{.ID}}" data-id="{{.ID}}">
+    <div class="task-handle drag-handle">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="9" cy="12" r="1" />
+            <circle cx="9" cy="5" r="1" />
+            <circle cx="9" cy="19" r="1" />
+            <circle cx="15" cy="12" r="1" />
+            <circle cx="15" cy="5" r="1" />
+            <circle cx="15" cy="19" r="1" />
+        </svg>
+    </div>
+
+    <div class="task-content">
+        <div class="task-main" hx-get="/tasks/{{.ID}}/details" hx-target="#slideover-container" hx-swap="innerHTML">
+            <h3 class="task-name">{{.Name}}</h3>
+            {{if .Subtasks}}
+            <div class="task-progress-bar">
+                <div class="task-progress-fill" style="width: {{.Completion}}%"></div>
+            </div>
+            {{end}}
+        </div>
+
+        {{if not .Subtasks}}
+        <div class="task-slider">
+            <input type="range" min="0" max="100" value="{{.Completion}}" class="range-slider" name="completion"
+                hx-patch="/tasks/{{.ID}}" hx-trigger="change" hx-swap="none">
+            <span class="task-percent">{{.Completion}}%</span>
+        </div>
+        {{else}}
+        <span class="task-percent">{{.Completion}}%</span>
+        {{end}}
+    </div>
+</div>
+{{end}}

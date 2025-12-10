@@ -1,0 +1,604 @@
+/* Vibes Todo - Clean Design System */
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600&display=swap');
+
+/* ==========================================
+   CSS Variables
+   ========================================== */
+:root {
+    /* Colors - Monochrome */
+    --color-bg: #ffffff;
+    --color-surface: #fafafa;
+    --color-text: #18181b;
+    --color-text-muted: #71717a;
+    --color-text-faint: #a1a1aa;
+    --color-border: #e4e4e7;
+    --color-border-light: #f4f4f5;
+
+    /* Accent - Fuschia (used sparingly) */
+    --color-accent: #d946ef;
+    --color-accent-muted: #f0abfc;
+
+    /* Spacing */
+    --space-xs: 0.25rem;
+    --space-sm: 0.5rem;
+    --space-md: 1rem;
+    --space-lg: 1.5rem;
+    --space-xl: 2rem;
+    --space-2xl: 3rem;
+
+    /* Typography */
+    --font-family: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-size-xs: 0.75rem;
+    --font-size-sm: 0.875rem;
+    --font-size-base: 1rem;
+    --font-size-lg: 1.25rem;
+    --font-size-xl: 1.5rem;
+    --font-size-2xl: 2rem;
+
+    /* Transitions */
+    --transition-fast: 150ms ease;
+    --transition-normal: 200ms ease;
+}
+
+/* ==========================================
+   Base Styles
+   ========================================== */
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+html,
+body {
+    height: 100%;
+}
+
+body {
+    font-family: var(--font-family);
+    font-size: var(--font-size-base);
+    line-height: 1.5;
+    color: var(--color-text);
+    background-color: var(--color-bg);
+    -webkit-font-smoothing: antialiased;
+}
+
+/* ==========================================
+   App Layout
+   ========================================== */
+.app {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    max-width: 48rem;
+    margin: 0 auto;
+    padding: var(--space-xl);
+}
+
+.app-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    padding-bottom: var(--space-md);
+    margin-bottom: var(--space-2xl);
+    border-bottom: 1px solid var(--color-border);
+}
+
+.app-title {
+    font-size: var(--font-size-2xl);
+    font-weight: 300;
+    letter-spacing: -0.025em;
+}
+
+.content-scroll {
+    flex: 1;
+    overflow-y: auto;
+    padding-right: var(--space-sm);
+}
+
+.content-scroll::-webkit-scrollbar {
+    width: 6px;
+}
+
+.content-scroll::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.content-scroll::-webkit-scrollbar-thumb {
+    background-color: var(--color-border);
+    border-radius: 999px;
+}
+
+.content-scroll::-webkit-scrollbar-thumb:hover {
+    background-color: var(--color-text-faint);
+}
+
+/* ==========================================
+   Buttons
+   ========================================== */
+.btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: var(--font-size-sm);
+    color: var(--color-text-muted);
+    transition: color var(--transition-fast);
+}
+
+.btn:hover {
+    color: var(--color-text);
+}
+
+.btn-add {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-sm);
+}
+
+.btn-add .arrow {
+    display: inline-block;
+    transition: transform var(--transition-fast);
+}
+
+.btn-add:hover .arrow {
+    transform: translateX(4px);
+}
+
+/* ==========================================
+   Categories
+   ========================================== */
+.categories-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2xl);
+}
+
+.category {
+    padding-bottom: var(--space-lg);
+}
+
+.category-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--space-lg);
+}
+
+.category-header-left {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+}
+
+.category-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    margin-left: calc(-1 * var(--space-xs));
+    color: var(--color-text-faint);
+    transition: color var(--transition-fast);
+}
+
+.category-toggle:hover {
+    color: var(--color-text);
+}
+
+.category-toggle svg {
+    transition: transform var(--transition-fast);
+}
+
+.category-toggle.collapsed svg {
+    transform: rotate(-90deg);
+}
+
+.category-info {
+    display: flex;
+    flex-direction: column;
+}
+
+.category-name {
+    font-size: var(--font-size-lg);
+    font-weight: 500;
+}
+
+.category-meta {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    margin-top: var(--space-xs);
+}
+
+.category-actions {
+    opacity: 0;
+    transition: opacity var(--transition-fast);
+}
+
+.category:hover .category-actions {
+    opacity: 1;
+}
+
+/* ==========================================
+   Tasks List
+   ========================================== */
+.tasks-list {
+    border-left: 1px solid var(--color-border-light);
+    margin-left: var(--space-md);
+    padding-left: var(--space-lg);
+    min-height: 40px;
+}
+
+.tasks-list.hidden {
+    display: none;
+}
+
+.tasks-footer {
+    padding-top: var(--space-md);
+}
+
+/* ==========================================
+   Task Item
+   ========================================== */
+.task {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    padding: var(--space-sm) 0;
+    border-bottom: 1px solid var(--color-border-light);
+    transition: background-color var(--transition-fast);
+}
+
+.task:last-of-type {
+    border-bottom: none;
+}
+
+.task:hover {
+    background-color: var(--color-surface);
+}
+
+.task-handle {
+    opacity: 0;
+    color: var(--color-text-faint);
+    transition: opacity var(--transition-fast), color var(--transition-fast);
+}
+
+.task:hover .task-handle {
+    opacity: 1;
+}
+
+.task-handle:hover {
+    color: var(--color-text);
+}
+
+.task-content {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: var(--space-lg);
+}
+
+.task-main {
+    flex: 1;
+    min-width: 0;
+    cursor: pointer;
+}
+
+.task-name {
+    font-size: var(--font-size-base);
+    font-weight: 400;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.task-progress-bar {
+    height: 2px;
+    width: 100%;
+    background-color: var(--color-border-light);
+    border-radius: 999px;
+    margin-top: var(--space-sm);
+    overflow: hidden;
+}
+
+.task-progress-fill {
+    height: 100%;
+    background-color: var(--color-text);
+    transition: width var(--transition-normal);
+}
+
+.task-slider {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    width: 150px;
+}
+
+.task-percent {
+    font-size: var(--font-size-xs);
+    font-family: monospace;
+    color: var(--color-text-muted);
+    min-width: 2.5rem;
+    text-align: right;
+}
+
+/* ==========================================
+   Progress Slider (Range Input)
+   ========================================== */
+.range-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    background: transparent;
+    height: 24px;
+    cursor: pointer;
+    width: 100%;
+    display: block;
+}
+
+.range-slider:focus {
+    outline: none;
+}
+
+.range-slider::-webkit-slider-runnable-track {
+    width: 100%;
+    height: 2px;
+    background: var(--color-border);
+    border-radius: 999px;
+    transition: background var(--transition-fast);
+}
+
+.range-slider:hover::-webkit-slider-runnable-track {
+    background: var(--color-text-faint);
+}
+
+.range-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    height: 14px;
+    width: 14px;
+    border-radius: 50%;
+    background: var(--color-bg);
+    border: 2px solid var(--color-text);
+    margin-top: -6px;
+    transition: transform var(--transition-fast), background var(--transition-fast);
+}
+
+.range-slider:active::-webkit-slider-thumb {
+    transform: scale(1.15);
+    background: var(--color-accent);
+    border-color: var(--color-accent);
+}
+
+/* Firefox */
+.range-slider::-moz-range-track {
+    width: 100%;
+    height: 2px;
+    background: var(--color-border);
+    border-radius: 999px;
+}
+
+.range-slider::-moz-range-thumb {
+    height: 14px;
+    width: 14px;
+    border-radius: 50%;
+    background: var(--color-bg);
+    border: 2px solid var(--color-text);
+}
+
+/* ==========================================
+   Drag Handle
+   ========================================== */
+.drag-handle {
+    cursor: grab;
+    color: var(--color-text-faint);
+    transition: color var(--transition-fast);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.drag-handle:hover {
+    color: var(--color-text);
+}
+
+.drag-handle:active {
+    cursor: grabbing;
+}
+
+/* ==========================================
+   Slideover Panel
+   ========================================== */
+.slideover {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    max-width: 28rem;
+    background: var(--color-bg);
+    box-shadow: -4px 0 24px rgba(0, 0, 0, 0.08);
+    border-left: 1px solid var(--color-border-light);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+}
+
+.slideover-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: var(--space-xl);
+    border-bottom: 1px solid var(--color-border-light);
+}
+
+.slideover-title {
+    font-size: var(--font-size-xl);
+    font-weight: 300;
+}
+
+.slideover-close {
+    color: var(--color-text-muted);
+    transition: color var(--transition-fast);
+}
+
+.slideover-close:hover {
+    color: var(--color-text);
+}
+
+.slideover-body {
+    flex: 1;
+    padding: var(--space-xl);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xl);
+}
+
+/* ==========================================
+   Form Fields
+   ========================================== */
+.form-field {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+}
+
+.field-label {
+    font-size: var(--font-size-xs);
+    font-weight: 500;
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+}
+
+.field-input {
+    width: 100%;
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid var(--color-border);
+    padding: var(--space-sm) 0;
+    font-family: inherit;
+    font-size: var(--font-size-lg);
+    color: var(--color-text);
+    transition: border-color var(--transition-fast);
+}
+
+.field-input:focus {
+    outline: none;
+    border-color: var(--color-accent);
+}
+
+.field-textarea {
+    width: 100%;
+    background: var(--color-surface);
+    border: none;
+    border-radius: 4px;
+    padding: var(--space-md);
+    font-family: inherit;
+    font-size: var(--font-size-base);
+    color: var(--color-text-muted);
+    line-height: 1.6;
+    resize: vertical;
+    transition: box-shadow var(--transition-fast);
+}
+
+.field-textarea:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--color-accent-muted);
+}
+
+.field-textarea::placeholder {
+    color: var(--color-text-faint);
+}
+
+/* ==========================================
+   Subtasks
+   ========================================== */
+.subtasks-section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+}
+
+.subtasks-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-bottom: var(--space-sm);
+    border-bottom: 1px solid var(--color-border-light);
+}
+
+.subtasks-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+}
+
+.subtask {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    padding: var(--space-sm) 0;
+}
+
+.subtask-handle {
+    opacity: 0;
+    transition: opacity var(--transition-fast);
+}
+
+.subtask:hover .subtask-handle {
+    opacity: 1;
+}
+
+.subtask-input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    font-family: inherit;
+    font-size: var(--font-size-sm);
+    color: var(--color-text);
+}
+
+.subtask-input:focus {
+    outline: none;
+}
+
+.subtask-input::placeholder {
+    color: var(--color-text-faint);
+}
+
+.subtask-slider {
+    width: 100px;
+}
+
+/* ==========================================
+   Drag & Drop States
+   ========================================== */
+.ghost {
+    background-color: var(--color-surface);
+    opacity: 0.8;
+}
+
+.sortable-ghost {
+    background-color: var(--color-surface);
+    opacity: 0.8;
+}
+
+/* ==========================================
+   Utilities
+   ========================================== */
+.hidden {
+    display: none !important;
+}
+
+.visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    border: 0;
+}
