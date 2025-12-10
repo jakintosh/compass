@@ -2,7 +2,10 @@ module git.sr.ht/~jakintosh/todo
 
 go 1.25.4
 
-require github.com/google/uuid v1.6.0
+require (
+	github.com/google/uuid v1.6.0
+	modernc.org/sqlite v1.40.1
+)
 
 require (
 	github.com/dustin/go-humanize v1.0.1 // indirect
@@ -14,5 +17,4 @@ require (
 	modernc.org/libc v1.66.10 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect
-	modernc.org/sqlite v1.40.1 // indirect
 )

@@ -15,13 +15,14 @@
         <div class="form-field">
             <label class="field-label">Name</label>
             <input type="text" value="{{.Name}}" class="field-input" hx-patch="/tasks/{{.ID}}" hx-trigger="change"
-                name="name" hx-swap="none">
+                name="name" hx-swap="none" onkeydown="if(event.key=='Enter') this.blur()">
         </div>
 
         <div class="form-field">
             <label class="field-label">Description</label>
             <textarea rows="5" class="field-textarea" placeholder="Add a description..." hx-patch="/tasks/{{.ID}}"
-                hx-trigger="change" name="description" hx-swap="none">{{.Description}}</textarea>
+                hx-trigger="change" name="description" hx-swap="none"
+                onkeydown="if(event.key=='Enter') this.blur()">{{.Description}}</textarea>
         </div>
 
         <div class="subtasks-section">
@@ -59,8 +60,10 @@
         </svg>
     </div>
 
-    <input type="text" value="{{.Name}}" class="subtask-input" placeholder="Subtask name..."
-        hx-patch="/subtasks/{{.ID}}" hx-trigger="change" name="name" hx-swap="none">
+    <div class="subtask-content" style="flex: 1; cursor: pointer;" hx-get="/subtasks/{{.ID}}/details"
+        hx-target="#slideover-container" hx-swap="innerHTML">
+        <span class="subtask-name" style="font-size: var(--font-size-sm);">{{.Name}}</span>
+    </div>
 
     <div class="subtask-slider">
         <input type="range" min="0" max="100" value="{{.Completion}}" class="range-slider" name="completion"

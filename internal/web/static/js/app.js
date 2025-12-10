@@ -44,16 +44,32 @@ document.addEventListener('htmx:load', function (evt) {
         }
     });
 
-    // Initialize Sortable for Subtasks in Slideover
+    // Initialize Sortable for Subtasks in Slideover AND Main Page Inline Lists
+    // We want main page subtasks to be reorderable but NOT draggable outside their parent.
+    // Slideover subtasks also need reordering.
+
+    // Combining selector for both:
+    // [id^=subtasks-list-] covers both if we name them consistently.
+    // In index.html we used id="subtasks-list-{{.ID}}"
+    // In details.html id="subtasks-list-{{.ID}}"
+    // Wait, creating duplicate IDs if details slideover is open! 
+    // Actually details uses `subtasks-list-{{.ID}}`. Index uses `subtasks-list-{{.ID}}`.
+    // If slideover is open, we have valid HTML issue?
+    // HTMX swaps innerHTML of slideover container. If we open task details, we might have collision if we don't be careful.
+    // But `Sortable` inits on elements.
+
+    // Let's target them all.
     document.querySelectorAll('[id^=subtasks-list-]').forEach(function (el) {
         if (!el.sortableInitialized) {
             new Sortable(el, {
+                group: 'subtasks-' + el.id, // Unique group per list preventing cross-list dragging
                 animation: 150,
                 handle: '.subtask-handle',
                 ghostClass: 'ghost',
                 onEnd: function (evt) {
                     let taskId = el.id.replace('subtasks-list-', '');
                     let ids = [];
+                    // Handle both .subtask (slideover) and .subtask-inline (main page)
                     el.querySelectorAll('[data-subtask-id]').forEach(function (item) {
                         ids.push(item.getAttribute('data-subtask-id'));
                     });

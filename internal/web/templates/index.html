@@ -2,7 +2,7 @@
 <div class="app">
     <header class="app-header">
         <h1 class="app-title">In Progress</h1>
-        <button class="btn btn-add" hx-post="/categories" hx-target="#categories-list" hx-swap="beforeend">
+        <button class="btn btn-add" hx-post="/categories" hx-target="#categories-list" hx-swap="afterbegin">
             <span>New Category</span>
             <span class="arrow">+</span>
         </button>
@@ -30,7 +30,7 @@
 
             <div class="category-info">
                 <h2 class="category-name">{{.Name}}</h2>
-                <span class="category-meta">{{.AverageCompletion}}% complete</span>
+                <span id="category-meta-{{.ID}}" class="category-meta">{{.AverageCompletion}}% complete</span>
             </div>
         </div>
 
@@ -46,13 +46,15 @@
         </div>
     </div>
 
-    <div class="tasks-list {{if .Collapsed}}hidden{{end}}" data-category-id="{{.ID}}">
-        {{range .Tasks}}
-        {{template "task" .}}
-        {{end}}
+    <div class="category-content {{if .Collapsed}}hidden{{end}}">
+        <div class="tasks-list" id="tasks-list-{{.ID}}" data-category-id="{{.ID}}">
+            {{range .Tasks}}
+            {{template "task" .}}
+            {{end}}
+        </div>
 
         <div class="tasks-footer">
-            <button class="btn btn-add" hx-post="/categories/{{.ID}}/tasks" hx-target="#category-{{.ID}} .tasks-list"
+            <button class="btn btn-add" hx-post="/categories/{{.ID}}/tasks" hx-target="#tasks-list-{{.ID}}"
                 hx-swap="beforeend">
                 <span class="arrow">→</span>
                 <span>Add a task</span>
@@ -63,8 +65,58 @@
 {{end}}
 
 {{define "task"}}
-<div class="task" id="task-{{.ID}}" data-id="{{.ID}}">
-    <div class="task-handle drag-handle">
+<div class="task-wrapper" id="task-{{.ID}}" data-id="{{.ID}}">
+    <div class="task">
+        <div class="task-handle drag-handle">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="9" cy="12" r="1" />
+                <circle cx="9" cy="5" r="1" />
+                <circle cx="9" cy="19" r="1" />
+                <circle cx="15" cy="12" r="1" />
+                <circle cx="15" cy="5" r="1" />
+                <circle cx="15" cy="19" r="1" />
+            </svg>
+        </div>
+
+        <div class="task-content">
+            <div class="task-main" hx-get="/tasks/{{.ID}}/details" hx-target="#slideover-container" hx-swap="innerHTML">
+                <h3 id="task-name-{{.ID}}" class="task-name">{{.Name}}</h3>
+            </div>
+
+            <div class="task-right">
+                {{if .Subtasks}}
+                <div class="task-progress-bar">
+                    <div id="task-progress-fill-{{.ID}}" class="task-progress-fill" style="width: {{.Completion}}%">
+                    </div>
+                </div>
+                {{else}}
+                <div class="task-slider">
+                    <input type="range" min="0" max="100" value="{{.Completion}}" class="range-slider" name="completion"
+                        hx-patch="/tasks/{{.ID}}" hx-trigger="change" hx-swap="none">
+                </div>
+                {{end}}
+                <span id="task-percent-{{.ID}}" class="task-percent">{{.Completion}}%</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Inline Subtasks -->
+    {{if .Subtasks}}
+    <!-- ID used for Sortable -->
+    <div id="subtasks-list-{{.ID}}" class="subtasks-inline-list">
+        {{range .Subtasks}}
+        {{template "subtask_inline" .}}
+        {{end}}
+    </div>
+    {{end}}
+</div>
+{{end}}
+
+{{define "subtask_inline"}}
+<div class="task subtask-inline" data-subtask-id="{{.ID}}">
+    <!-- Subtask Drag Handle -->
+    <div class="subtask-handle drag-handle" style="margin-left: 1.5rem;">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
             stroke-linecap="round" stroke-linejoin="round">
             <circle cx="9" cy="12" r="1" />
@@ -76,25 +128,23 @@
         </svg>
     </div>
 
-    <div class="task-content">
-        <div class="task-main" hx-get="/tasks/{{.ID}}/details" hx-target="#slideover-container" hx-swap="innerHTML">
-            <h3 class="task-name">{{.Name}}</h3>
-            {{if .Subtasks}}
-            <div class="task-progress-bar">
-                <div class="task-progress-fill" style="width: {{.Completion}}%"></div>
-            </div>
-            {{end}}
+    <div class="task-content" style="padding-left: 0.5rem;">
+        <span class="subtask-icon" style="color: var(--color-text-faint); margin-right: 0.5rem;"
+            hx-get="/subtasks/{{.ID}}/details" hx-target="#slideover-container" hx-swap="innerHTML"
+            style="cursor: pointer;">↳</span>
+
+        <div class="task-main" hx-get="/subtasks/{{.ID}}/details" hx-target="#slideover-container" hx-swap="innerHTML">
+            <span id="subtask-name-{{.ID}}" class="task-name">{{.Name}}</span>
         </div>
 
-        {{if not .Subtasks}}
-        <div class="task-slider">
-            <input type="range" min="0" max="100" value="{{.Completion}}" class="range-slider" name="completion"
-                hx-patch="/tasks/{{.ID}}" hx-trigger="change" hx-swap="none">
-            <span class="task-percent">{{.Completion}}%</span>
+        <div class="task-right">
+            <div class="task-slider">
+                <input type="range" min="0" max="100" value="{{.Completion}}" class="range-slider" name="completion"
+                    hx-patch="/subtasks/{{.ID}}" hx-trigger="change" hx-swap="none">
+            </div>
+            <span id="subtask-percent-{{.ID}}" class="task-percent"
+                style="color: var(--color-text-muted);">{{.Completion}}%</span>
         </div>
-        {{else}}
-        <span class="task-percent">{{.Completion}}%</span>
-        {{end}}
     </div>
 </div>
 {{end}}

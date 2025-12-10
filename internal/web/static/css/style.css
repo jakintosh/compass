@@ -156,10 +156,6 @@ body {
     gap: var(--space-2xl);
 }
 
-.category {
-    padding-bottom: var(--space-lg);
-}
-
 .category-header {
     display: flex;
     align-items: center;
@@ -295,9 +291,16 @@ body {
     text-overflow: ellipsis;
 }
 
+/* Width for both sliders and progress bars */
+.task-control-width {
+    width: 160px;
+}
+
 .task-progress-bar {
-    height: 2px;
-    width: 100%;
+    height: 4px;
+    /* Still skinny */
+    width: 160px;
+    /* Fixed width matching slider */
     background-color: var(--color-border-light);
     border-radius: 999px;
     margin-top: var(--space-sm);
@@ -314,7 +317,18 @@ body {
     display: flex;
     align-items: center;
     gap: var(--space-sm);
-    width: 150px;
+    width: 160px;
+    /* Fixed width */
+    margin-left: auto;
+    /* Push to right if task-content allows, but task-content has gap. Let's rely on flex logic */
+}
+
+/* Actually, let's force the right side cluster to be fixed width */
+.task-right {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    margin-left: auto;
 }
 
 .task-percent {
@@ -328,6 +342,9 @@ body {
 /* ==========================================
    Progress Slider (Range Input)
    ========================================== */
+/* ==========================================
+   Progress Slider (Range Input)
+   ========================================== */
 .range-slider {
     -webkit-appearance: none;
     appearance: none;
@@ -336,55 +353,57 @@ body {
     cursor: pointer;
     width: 100%;
     display: block;
+    overflow: hidden;
+    border-radius: 4px;
 }
 
 .range-slider:focus {
     outline: none;
 }
 
+/* Webkit (Chrome, Safari, Edge) */
 .range-slider::-webkit-slider-runnable-track {
     width: 100%;
-    height: 2px;
-    background: var(--color-border);
-    border-radius: 999px;
-    transition: background var(--transition-fast);
-}
-
-.range-slider:hover::-webkit-slider-runnable-track {
-    background: var(--color-text-faint);
+    height: 24px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
 }
 
 .range-slider::-webkit-slider-thumb {
     -webkit-appearance: none;
-    height: 14px;
-    width: 14px;
-    border-radius: 50%;
-    background: var(--color-bg);
-    border: 2px solid var(--color-text);
-    margin-top: -6px;
-    transition: transform var(--transition-fast), background var(--transition-fast);
+    height: 24px;
+    /* Full height */
+    width: 4px;
+    /* Thin handle */
+    background: var(--color-text);
+    border: none;
+    border-radius: 0;
+    box-shadow: -100vw 0 0 100vw var(--color-text-muted);
+    /* Fill color */
+    transition: transform var(--transition-fast);
 }
 
-.range-slider:active::-webkit-slider-thumb {
-    transform: scale(1.15);
-    background: var(--color-accent);
-    border-color: var(--color-accent);
+.range-slider:hover::-webkit-slider-thumb {
+    background: var(--color-text);
 }
 
 /* Firefox */
 .range-slider::-moz-range-track {
     width: 100%;
-    height: 2px;
-    background: var(--color-border);
-    border-radius: 999px;
+    height: 24px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
 }
 
 .range-slider::-moz-range-thumb {
-    height: 14px;
-    width: 14px;
-    border-radius: 50%;
-    background: var(--color-bg);
-    border: 2px solid var(--color-text);
+    height: 24px;
+    width: 4px;
+    border: none;
+    border-radius: 0;
+    background: var(--color-text);
+    box-shadow: -100vw 0 0 100vw var(--color-text-muted);
 }
 
 /* ==========================================

@@ -56,11 +56,14 @@ func (s *SQLiteStore) migrate() error {
 		id TEXT PRIMARY KEY,
 		task_id TEXT NOT NULL,
 		name TEXT NOT NULL,
+		description TEXT DEFAULT '',
 		completion INTEGER DEFAULT 0,
 		sort_order INTEGER DEFAULT 0,
 		FOREIGN KEY(task_id) REFERENCES tasks(id) ON DELETE CASCADE
 	);
 	`
+	// Simple migration for existing DBs
+	s.db.Exec(`ALTER TABLE subtasks ADD COLUMN description TEXT DEFAULT ''`)
 	_, err := s.db.Exec(query)
 	return err
 }
@@ -107,7 +110,7 @@ func (s *SQLiteStore) GetCategories() ([]*domain.Category, error) {
 	}
 
 	// Fetch all subtasks
-	subRows, err := s.db.Query(`SELECT id, task_id, name, completion FROM subtasks ORDER BY sort_order ASC`)
+	subRows, err := s.db.Query(`SELECT id, task_id, name, description, completion FROM subtasks ORDER BY sort_order ASC`)
 	if err != nil {
 		return nil, err
 	}
@@ -116,7 +119,7 @@ func (s *SQLiteStore) GetCategories() ([]*domain.Category, error) {
 	subsByTask := make(map[string][]*domain.Subtask)
 	for subRows.Next() {
 		var sub domain.Subtask
-		if err := subRows.Scan(&sub.ID, &sub.TaskID, &sub.Name, &sub.Completion); err != nil {
+		if err := subRows.Scan(&sub.ID, &sub.TaskID, &sub.Name, &sub.Description, &sub.Completion); err != nil {
 			return nil, err
 		}
 		subsByTask[sub.TaskID] = append(subsByTask[sub.TaskID], &sub)
@@ -191,7 +194,7 @@ func (s *SQLiteStore) getTasksForCategory(catID string) ([]*domain.Task, error) 
 }
 
 func (s *SQLiteStore) getSubtasksForTask(taskID string) ([]*domain.Subtask, error) {
-	rows, err := s.db.Query(`SELECT id, task_id, name, completion FROM subtasks WHERE task_id = ? ORDER BY sort_order ASC`, taskID)
+	rows, err := s.db.Query(`SELECT id, task_id, name, description, completion FROM subtasks WHERE task_id = ? ORDER BY sort_order ASC`, taskID)
 	if err != nil {
 		return nil, err
 	}
@@ -200,7 +203,7 @@ func (s *SQLiteStore) getSubtasksForTask(taskID string) ([]*domain.Subtask, erro
 	var subs []*domain.Subtask
 	for rows.Next() {
 		var sub domain.Subtask
-		if err := rows.Scan(&sub.ID, &sub.TaskID, &sub.Name, &sub.Completion); err != nil {
+		if err := rows.Scan(&sub.ID, &sub.TaskID, &sub.Name, &sub.Description, &sub.Completion); err != nil {
 			return nil, err
 		}
 		subs = append(subs, &sub)
@@ -210,10 +213,10 @@ func (s *SQLiteStore) getSubtasksForTask(taskID string) ([]*domain.Subtask, erro
 
 func (s *SQLiteStore) AddCategory(name string) (*domain.Category, error) {
 	id := uuid.NewString()
-	// Get max sort_order
-	var maxOrder sql.NullInt64
-	s.db.QueryRow("SELECT MAX(sort_order) FROM categories").Scan(&maxOrder)
-	order := int(maxOrder.Int64) + 1
+	// Get min sort_order
+	var minOrder sql.NullInt64
+	s.db.QueryRow("SELECT MIN(sort_order) FROM categories").Scan(&minOrder)
+	order := int(minOrder.Int64) - 1
 
 	_, err := s.db.Exec(`INSERT INTO categories (id, name, sort_order) VALUES (?, ?, ?)`, id, name, order)
 	if err != nil {
@@ -352,7 +355,7 @@ func (s *SQLiteStore) ReorderTasks(catID string, taskIDs []string) error {
 
 func (s *SQLiteStore) GetSubtask(id string) (*domain.Subtask, error) {
 	var sub domain.Subtask
-	err := s.db.QueryRow(`SELECT id, task_id, name, completion FROM subtasks WHERE id = ?`, id).Scan(&sub.ID, &sub.TaskID, &sub.Name, &sub.Completion)
+	err := s.db.QueryRow(`SELECT id, task_id, name, description, completion FROM subtasks WHERE id = ?`, id).Scan(&sub.ID, &sub.TaskID, &sub.Name, &sub.Description, &sub.Completion)
 	if err != nil {
 		return nil, err
 	}
@@ -390,7 +393,7 @@ func (s *SQLiteStore) AddSubtask(taskID string, name string) (*domain.Subtask, e
 }
 
 func (s *SQLiteStore) UpdateSubtask(sub *domain.Subtask) error {
-	_, err := s.db.Exec(`UPDATE subtasks SET name = ?, completion = ? WHERE id = ?`, sub.Name, sub.Completion, sub.ID)
+	_, err := s.db.Exec(`UPDATE subtasks SET name = ?, description = ?, completion = ? WHERE id = ?`, sub.Name, sub.Description, sub.Completion, sub.ID)
 	if err != nil {
 		return err
 	}

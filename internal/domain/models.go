@@ -1,10 +1,11 @@
 package domain
 
 type Subtask struct {
-	ID         string `json:"id"`
-	TaskID     string `json:"task_id"`
-	Name       string `json:"name"`
-	Completion int    `json:"completion"` // 0-100
+	ID          string `json:"id"`
+	TaskID      string `json:"task_id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Completion  int    `json:"completion"` // 0-100
 }
 
 type Task struct {
