@@ -1,5 +1,5 @@
 /* Vibes Todo - Clean Design System */
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
 /* ==========================================
    CSS Variables
@@ -15,8 +15,8 @@
     --color-border-light: #f4f4f5;
 
     /* Accent - Fuschia (used sparingly) */
-    --color-accent: #d946ef;
-    --color-accent-muted: #f0abfc;
+    --color-accent: #ef4687;
+    --color-accent-muted: #fcabc6;
 
     /* Spacing */
     --space-xs: 0.25rem;
@@ -27,7 +27,7 @@
     --space-2xl: 3rem;
 
     /* Typography */
-    --font-family: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
     --font-size-xs: 0.75rem;
     --font-size-sm: 0.875rem;
     --font-size-base: 1rem;
@@ -88,7 +88,7 @@ body {
 
 .app-title {
     font-size: var(--font-size-2xl);
-    font-weight: 300;
+    font-weight: 700;
     letter-spacing: -0.025em;
 }
 
@@ -435,7 +435,7 @@ body {
 
 .slideover-title {
     font-size: var(--font-size-xl);
-    font-weight: 300;
+    font-weight: 600;
 }
 
 .slideover-close {
