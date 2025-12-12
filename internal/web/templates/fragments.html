@@ -1,0 +1,26 @@
+{{define "task_percent"}}
+<span id="task-percent-{{.ID}}" class="task-percent" {{if .Partial}} hx-swap-oob="true" {{end}}>{{.Completion}}%</span>
+{{end}}
+
+{{define "category_meta"}}
+<span id="category-meta-{{.ID}}" class="category-meta" {{if .Partial}} hx-swap-oob="true"
+    {{end}}>{{.AverageCompletion}}% complete</span>
+{{end}}
+
+{{define "task_name"}}
+<h3 id="task-name-{{.ID}}" class="task-name" {{if .Partial}} hx-swap-oob="true" {{end}}>{{.Name}}</h3>
+{{end}}
+
+{{define "subtask_name"}}
+<span id="subtask-name-{{.ID}}" class="task-name" {{if .Partial}} hx-swap-oob="true" {{end}}>{{.Name}}</span>
+{{end}}
+
+{{define "subtask_percent"}}
+<span id="subtask-percent-{{.ID}}" class="task-percent" {{if .Partial}} hx-swap-oob="true"
+    {{end}}>{{.Completion}}%</span>
+{{end}}
+
+{{define "task_progress_fill"}}
+<div id="task-progress-fill-{{.ID}}" class="task-progress-fill" style="width: {{.Completion}}%" {{if .Partial}}
+    hx-swap-oob="true" {{end}}></div>
+{{end}}

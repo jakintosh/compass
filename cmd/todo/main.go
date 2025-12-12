@@ -17,7 +17,10 @@ func main() {
 	s.Seed() // Add dummy data if empty
 
 	// Initialize Web Server
-	srv := web.NewServer(s)
+	srv, err := web.NewServer(s)
+	if err != nil {
+		log.Fatalf("Failed to initialize server: %v", err)
+	}
 
 	// Start Server
 	log.Println("Starting server on :8080...")

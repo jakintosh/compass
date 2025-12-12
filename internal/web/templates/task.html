@@ -1,0 +1,63 @@
+<div class="task-wrapper" id="task-{{.ID}}" data-id="{{.ID}}" {{if .Partial}} hx-swap-oob="true" {{end}}>
+    <div class="task">
+        <div class="task-handle drag-handle">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="9" cy="12" r="1" />
+                <circle cx="9" cy="5" r="1" />
+                <circle cx="9" cy="19" r="1" />
+                <circle cx="15" cy="12" r="1" />
+                <circle cx="15" cy="5" r="1" />
+                <circle cx="15" cy="19" r="1" />
+            </svg>
+        </div>
+
+        <div class="task-content">
+            <div class="task-main" hx-get="/tasks/{{.ID}}/details" hx-target="#slideover-container" hx-swap="innerHTML">
+                <h3 id="task-name-{{.ID}}" class="task-name">{{.Name}}</h3>
+            </div>
+
+            <div class="task-right">
+                {{if .Subtasks}}
+                <div class="task-progress-bar">
+                    <div id="task-progress-fill-{{.ID}}" class="task-progress-fill" style="width: {{.Completion}}%">
+                    </div>
+                </div>
+                {{else}}
+                <div class="task-slider">
+                    <input type="range" min="0" max="100" value="{{.Completion}}" class="range-slider" name="completion"
+                        hx-patch="/tasks/{{.ID}}" hx-trigger="change" hx-swap="none">
+                </div>
+                {{end}}
+                <span id="task-percent-{{.ID}}" class="task-percent">{{.Completion}}%</span>
+                <button class="btn btn-icon-sm" hx-post="/tasks/{{.ID}}/subtasks" hx-target="#task-{{.ID}}"
+                    hx-swap="outerHTML">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="12" y1="5" x2="12" y2="19"></line>
+                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Inline Subtasks -->
+    {{if .Subtasks}}
+    <!-- ID used for Sortable -->
+    <div id="subtasks-list-{{.ID}}" class="subtasks-inline-list">
+        {{range .Subtasks}}
+        {{template "subtask.html" (toSubtaskView .)}}
+        {{end}}
+    </div>
+
+    <!-- Add subtask row (not draggable) -->
+    <div class="subtask-add-row">
+        <button class="btn btn-add" hx-post="/tasks/{{.ID}}/subtasks" hx-target="#subtasks-list-{{.ID}}"
+            hx-swap="beforeend">
+            <span class="arrow">→</span>
+            <span>Add a subtask</span>
+        </button>
+    </div>
+    {{end}}
+</div>

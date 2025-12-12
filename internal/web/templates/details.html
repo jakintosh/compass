@@ -28,29 +28,3 @@
     </div>
 </div>
 {{end}}
-
-{{define "subtask"}}
-<div class="subtask" data-subtask-id="{{.ID}}">
-    <div class="subtask-handle drag-handle">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-            stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="9" cy="12" r="1" />
-            <circle cx="9" cy="5" r="1" />
-            <circle cx="9" cy="19" r="1" />
-            <circle cx="15" cy="12" r="1" />
-            <circle cx="15" cy="5" r="1" />
-            <circle cx="15" cy="19" r="1" />
-        </svg>
-    </div>
-
-    <div class="subtask-content" style="flex: 1; cursor: pointer;" hx-get="/subtasks/{{.ID}}/details"
-        hx-target="#slideover-container" hx-swap="innerHTML">
-        <span class="subtask-name" style="font-size: var(--font-size-sm);">{{.Name}}</span>
-    </div>
-
-    <div class="subtask-slider">
-        <input type="range" min="0" max="100" value="{{.Completion}}" class="range-slider" name="completion"
-            hx-patch="/subtasks/{{.ID}}" hx-trigger="change" hx-swap="none">
-    </div>
-</div>
-{{end}}
