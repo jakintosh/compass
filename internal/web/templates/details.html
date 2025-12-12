@@ -25,23 +25,6 @@
                 onkeydown="if(event.key=='Enter') this.blur()">{{.Description}}</textarea>
         </div>
 
-        <div class="subtasks-section">
-            <div class="subtasks-header">
-                <label class="field-label">Subtasks</label>
-            </div>
-
-            <div id="subtasks-list-{{.ID}}" class="subtasks-list">
-                {{range .Subtasks}}
-                {{template "subtask" .}}
-                {{end}}
-            </div>
-
-            <button class="btn btn-add" hx-post="/tasks/{{.ID}}/subtasks" hx-target="#subtasks-list-{{.ID}}"
-                hx-swap="beforeend">
-                <span class="arrow">+</span>
-                <span>Add subtask</span>
-            </button>
-        </div>
     </div>
 </div>
 {{end}}

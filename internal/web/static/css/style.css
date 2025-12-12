@@ -147,6 +147,25 @@ body {
     transform: translateX(4px);
 }
 
+.btn-icon-sm {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-xs);
+    opacity: 0;
+    transition: opacity var(--transition-fast);
+}
+
+.task:hover .btn-icon-sm {
+    opacity: 1;
+}
+
+/* Spacer to match btn-icon-sm width for alignment */
+.btn-spacer {
+    width: calc(14px + 2 * var(--space-xs));
+    /* SVG width + padding */
+}
+
 /* ==========================================
    Categories
    ========================================== */
@@ -159,36 +178,46 @@ body {
 .category-header {
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    gap: var(--space-md);
     margin-bottom: var(--space-lg);
 }
 
-.category-header-left {
-    display: flex;
-    align-items: center;
-    gap: var(--space-md);
-}
-
-.category-toggle {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 24px;
-    height: 24px;
-    margin-left: calc(-1 * var(--space-xs));
+.category-handle {
+    opacity: 0;
     color: var(--color-text-faint);
-    transition: color var(--transition-fast);
+    transition: opacity var(--transition-fast), color var(--transition-fast);
 }
 
-.category-toggle:hover {
+.category:hover .category-handle {
+    opacity: 1;
+}
+
+.category-handle:hover {
     color: var(--color-text);
 }
 
-.category-toggle svg {
-    transition: transform var(--transition-fast);
+.category-collapse-trigger {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    flex: 1;
+    cursor: pointer;
 }
 
-.category-toggle.collapsed svg {
+.category-collapse-trigger:hover .category-name {
+    color: var(--color-text-muted);
+}
+
+.category-toggle-icon {
+    color: var(--color-text-faint);
+    transition: transform var(--transition-fast), color var(--transition-fast);
+}
+
+.category-collapse-trigger:hover .category-toggle-icon {
+    color: var(--color-text);
+}
+
+.category-collapse-trigger.collapsed .category-toggle-icon {
     transform: rotate(-90deg);
 }
 
@@ -200,21 +229,13 @@ body {
 .category-name {
     font-size: var(--font-size-lg);
     font-weight: 500;
+    transition: color var(--transition-fast);
 }
 
 .category-meta {
     font-size: var(--font-size-xs);
     color: var(--color-text-muted);
     margin-top: var(--space-xs);
-}
-
-.category-actions {
-    opacity: 0;
-    transition: opacity var(--transition-fast);
-}
-
-.category:hover .category-actions {
-    opacity: 1;
 }
 
 /* ==========================================
@@ -247,7 +268,7 @@ body {
     transition: background-color var(--transition-fast);
 }
 
-.task:last-of-type {
+.task-wrapper:last-of-type>.task {
     border-bottom: none;
 }
 
@@ -337,6 +358,54 @@ body {
     color: var(--color-text-muted);
     min-width: 2.5rem;
     text-align: right;
+}
+
+/* Add subtask button on task row */
+.btn-add-subtask {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-xs);
+    color: var(--color-text-faint);
+    opacity: 0;
+    transition: opacity var(--transition-fast), color var(--transition-fast);
+}
+
+.task:hover .btn-add-subtask {
+    opacity: 1;
+}
+
+.btn-add-subtask:hover {
+    color: var(--color-accent);
+}
+
+/* Subtask add row (non-draggable) */
+.subtask-add-row {
+    padding: var(--space-sm) 0;
+    padding-left: calc(var(--space-lg) + 1.5rem);
+}
+
+/* Inline subtasks on main page */
+.subtasks-inline-list {
+    padding-left: calc(var(--space-lg) + 1.5rem);
+}
+
+.subtask-inline {
+    padding: var(--space-xs) 0;
+    border-bottom: 1px solid var(--color-border-light);
+}
+
+.subtask-inline:last-child {
+    border-bottom: none;
+}
+
+.subtask-inline .subtask-handle {
+    opacity: 0;
+    transition: opacity var(--transition-fast);
+}
+
+.subtask-inline:hover .subtask-handle {
+    opacity: 1;
 }
 
 /* ==========================================
@@ -589,6 +658,37 @@ body {
 
 .subtask-slider {
     width: 100px;
+}
+
+/* ==========================================
+   Inline Subtasks (Main Page)
+   ========================================== */
+.subtasks-inline-list {
+    margin-left: calc(var(--space-md) + 14px);
+    /* Align with task content after drag handle */
+    padding-left: var(--space-lg);
+    border-left: 1px solid var(--color-border-light);
+}
+
+.subtask-inline {
+    padding-left: var(--space-md);
+}
+
+/* Make subtask handle visible on hover (matches task handle) */
+.subtask-inline:hover .subtask-handle {
+    opacity: 1;
+}
+
+.subtask-icon {
+    color: var(--color-text-faint);
+    margin-right: var(--space-sm);
+    font-size: var(--font-size-sm);
+}
+
+.subtask-add-row {
+    margin-left: calc(var(--space-md) + 14px);
+    padding-left: var(--space-lg);
+    padding-top: var(--space-sm);
 }
 
 /* ==========================================

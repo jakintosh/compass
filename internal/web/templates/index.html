@@ -19,30 +19,30 @@
 {{define "category"}}
 <div class="category" id="category-{{.ID}}" data-id="{{.ID}}">
     <div class="category-header">
-        <div class="category-header-left">
-            <button class="btn category-toggle {{if .Collapsed}}collapsed{{end}}"
-                hx-patch="/categories/{{.ID}}/toggle-collapse" hx-target="#category-{{.ID}}" hx-swap="outerHTML">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                    stroke-linecap="round" stroke-linejoin="round">
-                    <polyline points="6 9 12 15 18 9"></polyline>
-                </svg>
-            </button>
+        <!-- Drag handle on far left -->
+        <div class="category-handle drag-handle handle">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="9" cy="12" r="1" />
+                <circle cx="9" cy="5" r="1" />
+                <circle cx="9" cy="19" r="1" />
+                <circle cx="15" cy="12" r="1" />
+                <circle cx="15" cy="5" r="1" />
+                <circle cx="15" cy="19" r="1" />
+            </svg>
+        </div>
 
+        <!-- Clickable area: name + collapse arrow -->
+        <div class="category-collapse-trigger {{if .Collapsed}}collapsed{{end}}"
+            hx-patch="/categories/{{.ID}}/toggle-collapse" hx-target="#category-{{.ID}}" hx-swap="outerHTML">
             <div class="category-info">
                 <h2 class="category-name">{{.Name}}</h2>
                 <span id="category-meta-{{.ID}}" class="category-meta">{{.AverageCompletion}}% complete</span>
             </div>
-        </div>
-
-        <div class="category-actions">
-            <button class="btn drag-handle handle">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                    stroke-linecap="round" stroke-linejoin="round">
-                    <line x1="3" y1="12" x2="21" y2="12"></line>
-                    <line x1="3" y1="6" x2="21" y2="6"></line>
-                    <line x1="3" y1="18" x2="21" y2="18"></line>
-                </svg>
-            </button>
+            <svg class="category-toggle-icon" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
         </div>
     </div>
 
@@ -97,6 +97,14 @@
                 </div>
                 {{end}}
                 <span id="task-percent-{{.ID}}" class="task-percent">{{.Completion}}%</span>
+                <button class="btn btn-icon-sm" hx-post="/tasks/{{.ID}}/subtasks" hx-target="#task-{{.ID}}"
+                    hx-swap="outerHTML">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="12" y1="5" x2="12" y2="19"></line>
+                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                    </svg>
+                </button>
             </div>
         </div>
     </div>
@@ -109,6 +117,15 @@
         {{template "subtask_inline" .}}
         {{end}}
     </div>
+
+    <!-- Add subtask row (not draggable) -->
+    <div class="subtask-add-row">
+        <button class="btn btn-add" hx-post="/tasks/{{.ID}}/subtasks" hx-target="#subtasks-list-{{.ID}}"
+            hx-swap="beforeend">
+            <span class="arrow">→</span>
+            <span>Add a subtask</span>
+        </button>
+    </div>
     {{end}}
 </div>
 {{end}}
@@ -116,7 +133,7 @@
 {{define "subtask_inline"}}
 <div class="task subtask-inline" data-subtask-id="{{.ID}}">
     <!-- Subtask Drag Handle -->
-    <div class="subtask-handle drag-handle" style="margin-left: 1.5rem;">
+    <div class="subtask-handle drag-handle">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
             stroke-linecap="round" stroke-linejoin="round">
             <circle cx="9" cy="12" r="1" />
@@ -128,10 +145,8 @@
         </svg>
     </div>
 
-    <div class="task-content" style="padding-left: 0.5rem;">
-        <span class="subtask-icon" style="color: var(--color-text-faint); margin-right: 0.5rem;"
-            hx-get="/subtasks/{{.ID}}/details" hx-target="#slideover-container" hx-swap="innerHTML"
-            style="cursor: pointer;">↳</span>
+    <div class="task-content">
+        <span class="subtask-icon">↳</span>
 
         <div class="task-main" hx-get="/subtasks/{{.ID}}/details" hx-target="#slideover-container" hx-swap="innerHTML">
             <span id="subtask-name-{{.ID}}" class="task-name">{{.Name}}</span>
@@ -142,8 +157,9 @@
                 <input type="range" min="0" max="100" value="{{.Completion}}" class="range-slider" name="completion"
                     hx-patch="/subtasks/{{.ID}}" hx-trigger="change" hx-swap="none">
             </div>
-            <span id="subtask-percent-{{.ID}}" class="task-percent"
-                style="color: var(--color-text-muted);">{{.Completion}}%</span>
+            <span id="subtask-percent-{{.ID}}" class="task-percent">{{.Completion}}%</span>
+            <!-- Spacer to align with parent task's + button -->
+            <div class="btn-spacer"></div>
         </div>
     </div>
 </div>
