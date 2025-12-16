@@ -38,6 +38,7 @@ func (s *SQLiteStore) migrate() error {
 	CREATE TABLE IF NOT EXISTS categories (
 		id TEXT PRIMARY KEY,
 		name TEXT NOT NULL,
+		description TEXT DEFAULT '',
 		collapsed BOOLEAN DEFAULT 0,
 		sort_order INTEGER DEFAULT 0
 	);
@@ -48,6 +49,7 @@ func (s *SQLiteStore) migrate() error {
 		name TEXT NOT NULL,
 		description TEXT DEFAULT '',
 		completion INTEGER DEFAULT 0,
+		expanded BOOLEAN DEFAULT 0,
 		sort_order INTEGER DEFAULT 0,
 		FOREIGN KEY(category_id) REFERENCES categories(id) ON DELETE CASCADE
 	);
@@ -62,14 +64,16 @@ func (s *SQLiteStore) migrate() error {
 		FOREIGN KEY(task_id) REFERENCES tasks(id) ON DELETE CASCADE
 	);
 	`
-	// Simple migration for existing DBs
+	// Simple migrations for existing DBs
+	s.db.Exec(`ALTER TABLE categories ADD COLUMN description TEXT DEFAULT ''`)
+	s.db.Exec(`ALTER TABLE tasks ADD COLUMN expanded BOOLEAN DEFAULT 0`)
 	s.db.Exec(`ALTER TABLE subtasks ADD COLUMN description TEXT DEFAULT ''`)
 	_, err := s.db.Exec(query)
 	return err
 }
 
 func (s *SQLiteStore) GetCategories() ([]*domain.Category, error) {
-	rows, err := s.db.Query(`SELECT id, name, collapsed FROM categories ORDER BY sort_order ASC`)
+	rows, err := s.db.Query(`SELECT id, name, description, collapsed FROM categories ORDER BY sort_order ASC`)
 	if err != nil {
 		return nil, err
 	}
@@ -78,7 +82,7 @@ func (s *SQLiteStore) GetCategories() ([]*domain.Category, error) {
 	var categories []*domain.Category
 	for rows.Next() {
 		var c domain.Category
-		if err := rows.Scan(&c.ID, &c.Name, &c.Collapsed); err != nil {
+		if err := rows.Scan(&c.ID, &c.Name, &c.Description, &c.Collapsed); err != nil {
 			return nil, err
 		}
 		c.Tasks = []*domain.Task{} // Initialize slice
@@ -90,7 +94,7 @@ func (s *SQLiteStore) GetCategories() ([]*domain.Category, error) {
 	// Optimization: Fetch all tasks and distribute them.
 	// Let's do the optimization to be cleaner.
 
-	taskRows, err := s.db.Query(`SELECT id, category_id, name, description, completion FROM tasks ORDER BY sort_order ASC`)
+	taskRows, err := s.db.Query(`SELECT id, category_id, name, description, completion, expanded FROM tasks ORDER BY sort_order ASC`)
 	if err != nil {
 		return nil, err
 	}
@@ -101,7 +105,7 @@ func (s *SQLiteStore) GetCategories() ([]*domain.Category, error) {
 
 	for taskRows.Next() {
 		var t domain.Task
-		if err := taskRows.Scan(&t.ID, &t.CategoryID, &t.Name, &t.Description, &t.Completion); err != nil {
+		if err := taskRows.Scan(&t.ID, &t.CategoryID, &t.Name, &t.Description, &t.Completion, &t.Expanded); err != nil {
 			return nil, err
 		}
 		t.Subtasks = []*domain.Subtask{}
@@ -143,7 +147,7 @@ func (s *SQLiteStore) GetCategories() ([]*domain.Category, error) {
 
 func (s *SQLiteStore) GetCategory(id string) (*domain.Category, error) {
 	var c domain.Category
-	err := s.db.QueryRow(`SELECT id, name, collapsed FROM categories WHERE id = ?`, id).Scan(&c.ID, &c.Name, &c.Collapsed)
+	err := s.db.QueryRow(`SELECT id, name, description, collapsed FROM categories WHERE id = ?`, id).Scan(&c.ID, &c.Name, &c.Description, &c.Collapsed)
 	if err != nil {
 		return nil, err
 	}
@@ -169,7 +173,7 @@ func (s *SQLiteStore) GetCategory(id string) (*domain.Category, error) {
 }
 
 func (s *SQLiteStore) getTasksForCategory(catID string) ([]*domain.Task, error) {
-	rows, err := s.db.Query(`SELECT id, category_id, name, description, completion FROM tasks WHERE category_id = ? ORDER BY sort_order ASC`, catID)
+	rows, err := s.db.Query(`SELECT id, category_id, name, description, completion, expanded FROM tasks WHERE category_id = ? ORDER BY sort_order ASC`, catID)
 	if err != nil {
 		return nil, err
 	}
@@ -178,7 +182,7 @@ func (s *SQLiteStore) getTasksForCategory(catID string) ([]*domain.Task, error) 
 	var tasks []*domain.Task
 	for rows.Next() {
 		var t domain.Task
-		if err := rows.Scan(&t.ID, &t.CategoryID, &t.Name, &t.Description, &t.Completion); err != nil {
+		if err := rows.Scan(&t.ID, &t.CategoryID, &t.Name, &t.Description, &t.Completion, &t.Expanded); err != nil {
 			return nil, err
 		}
 
@@ -231,7 +235,7 @@ func (s *SQLiteStore) AddCategory(name string) (*domain.Category, error) {
 }
 
 func (s *SQLiteStore) UpdateCategory(cat *domain.Category) error {
-	_, err := s.db.Exec(`UPDATE categories SET name = ?, collapsed = ? WHERE id = ?`, cat.Name, cat.Collapsed, cat.ID)
+	_, err := s.db.Exec(`UPDATE categories SET name = ?, description = ?, collapsed = ? WHERE id = ?`, cat.Name, cat.Description, cat.Collapsed, cat.ID)
 	return err
 }
 
@@ -265,7 +269,7 @@ func (s *SQLiteStore) ReorderCategories(ids []string) error {
 
 func (s *SQLiteStore) GetTask(id string) (*domain.Task, error) {
 	var t domain.Task
-	err := s.db.QueryRow(`SELECT id, category_id, name, description, completion FROM tasks WHERE id = ?`, id).Scan(&t.ID, &t.CategoryID, &t.Name, &t.Description, &t.Completion)
+	err := s.db.QueryRow(`SELECT id, category_id, name, description, completion, expanded FROM tasks WHERE id = ?`, id).Scan(&t.ID, &t.CategoryID, &t.Name, &t.Description, &t.Completion, &t.Expanded)
 	if err != nil {
 		return nil, err
 	}
@@ -296,7 +300,7 @@ func (s *SQLiteStore) AddTask(catID string, name string) (*domain.Task, error) {
 }
 
 func (s *SQLiteStore) UpdateTask(task *domain.Task) error {
-	_, err := s.db.Exec(`UPDATE tasks SET name = ?, description = ?, completion = ? WHERE id = ?`, task.Name, task.Description, task.Completion, task.ID)
+	_, err := s.db.Exec(`UPDATE tasks SET name = ?, description = ?, completion = ?, expanded = ? WHERE id = ?`, task.Name, task.Description, task.Completion, task.Expanded, task.ID)
 	return err
 }
 

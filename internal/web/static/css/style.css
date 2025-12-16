@@ -180,6 +180,7 @@ body {
     align-items: center;
     gap: var(--space-md);
     margin-bottom: var(--space-lg);
+    cursor: pointer;
 }
 
 .category-header:has(+ .category-content.hidden) {
@@ -200,16 +201,10 @@ body {
     color: var(--color-text);
 }
 
-.category-collapse-trigger {
+.category-expand-indicator {
     display: flex;
     align-items: center;
-    gap: var(--space-md);
-    flex: 1;
-    cursor: pointer;
-}
-
-.category-collapse-trigger:hover .category-name {
-    color: var(--color-text-muted);
+    flex-shrink: 0;
 }
 
 .category-toggle-icon {
@@ -217,17 +212,18 @@ body {
     transition: transform var(--transition-fast), color var(--transition-fast);
 }
 
-.category-collapse-trigger:hover .category-toggle-icon {
+.category-header:hover .category-toggle-icon {
     color: var(--color-text);
 }
 
-.category-collapse-trigger.collapsed .category-toggle-icon {
+.category-expand-indicator.collapsed .category-toggle-icon {
     transform: rotate(-90deg);
 }
 
 .category-info {
     display: flex;
     flex-direction: column;
+    flex: 1;
 }
 
 .category-name {
@@ -270,6 +266,7 @@ body {
     padding: var(--space-sm) 0;
     border-bottom: 1px solid var(--color-border-light);
     transition: background-color var(--transition-fast);
+    cursor: pointer;
 }
 
 .task-wrapper:last-of-type>.task {
@@ -305,7 +302,8 @@ body {
 .task-main {
     flex: 1;
     min-width: 0;
-    cursor: pointer;
+    display: flex;
+    align-items: center;
 }
 
 .task-name {
@@ -706,6 +704,102 @@ body {
 .sortable-ghost {
     background-color: var(--color-surface);
     opacity: 0.8;
+}
+
+/* ==========================================
+   Unified Interaction Elements
+   ========================================== */
+
+/* Edit Button - Circular icon button with hover state */
+.btn-edit-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 1px solid var(--color-border);
+    background: transparent;
+    color: var(--color-text-muted);
+    opacity: 0;
+    transition: opacity var(--transition-fast),
+        background-color var(--transition-fast),
+        border-color var(--transition-fast),
+        color var(--transition-fast);
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+/* Show on hover of parent row */
+.category-header:hover .btn-edit-icon,
+.task:hover .btn-edit-icon,
+.subtask-inline:hover .btn-edit-icon {
+    opacity: 1;
+}
+
+.btn-edit-icon:hover {
+    background-color: var(--color-surface);
+    border-color: var(--color-text-muted);
+    color: var(--color-text);
+}
+
+/* Drag Handle Indicator - visual only, shown on hover */
+.drag-handle-indicator {
+    opacity: 0;
+    color: var(--color-text-faint);
+    transition: opacity var(--transition-fast), color var(--transition-fast);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.category-header:hover .drag-handle-indicator,
+.task:hover .drag-handle-indicator,
+.subtask-inline:hover .drag-handle-indicator {
+    opacity: 1;
+}
+
+.drag-handle-indicator:hover {
+    color: var(--color-text);
+}
+
+/* Task Expand/Collapse Indicator */
+.task-expand-indicator {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+.task-toggle-icon {
+    color: var(--color-text-faint);
+    transition: transform var(--transition-fast), color var(--transition-fast);
+    transform: rotate(-90deg);
+    /* Points right when collapsed */
+}
+
+.task-expand-indicator.expanded .task-toggle-icon {
+    transform: rotate(0deg);
+    /* Points down when expanded */
+}
+
+.task:hover .task-toggle-icon {
+    color: var(--color-text);
+}
+
+/* Subtask count indicator (shown inline after task name when collapsed) */
+.subtask-indicator {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 999px;
+    padding: 0 var(--space-xs);
+    min-width: 1.25rem;
+    text-align: center;
+    line-height: 1.4;
+    margin-left: var(--space-sm);
+    flex-shrink: 0;
 }
 
 /* ==========================================

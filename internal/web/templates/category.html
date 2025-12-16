@@ -4,9 +4,10 @@
 {{end}}
 
 <div class="category" id="category-{{.ID}}" data-id="{{.ID}}" {{if .OOB}} hx-swap-oob="true" {{end}}>
-    <div class="category-header">
-        <!-- Drag handle on far left -->
-        <div class="category-handle drag-handle handle">
+    <div class="category-header" data-draggable hx-patch="/categories/{{.ID}}/toggle-collapse"
+        hx-target="#category-{{.ID}}" hx-swap="outerHTML">
+        <!-- Drag handle indicator on far left (visual only) -->
+        <div class="drag-handle-indicator">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                 stroke-linecap="round" stroke-linejoin="round">
                 <circle cx="9" cy="12" r="1" />
@@ -18,18 +19,29 @@
             </svg>
         </div>
 
-        <!-- Clickable area: name + collapse arrow -->
-        <div class="category-collapse-trigger {{if .Collapsed}}collapsed{{end}}"
-            hx-patch="/categories/{{.ID}}/toggle-collapse" hx-target="#category-{{.ID}}" hx-swap="outerHTML">
-            <div class="category-info">
-                <h2 class="category-name">{{.Name}}</h2>
-                {{template "category_meta" .}}
-            </div>
+        <!-- Collapse/expand arrow indicator (left of title, like tasks) -->
+        <div class="category-expand-indicator {{if .Collapsed}}collapsed{{end}}">
             <svg class="category-toggle-icon" width="16" height="16" viewBox="0 0 24 24" fill="none"
                 stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <polyline points="6 9 12 15 18 9"></polyline>
             </svg>
         </div>
+
+        <!-- Category info -->
+        <div class="category-info">
+            <h2 class="category-name">{{.Name}}</h2>
+            {{template "category_meta" .}}
+        </div>
+
+        <!-- Edit button on far right -->
+        <button class="btn btn-edit-icon" hx-get="/categories/{{.ID}}/details" hx-target="#slideover-container"
+            hx-swap="innerHTML" onclick="event.stopPropagation()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+            </svg>
+        </button>
     </div>
 
     <div class="category-content {{if .Collapsed}}hidden{{end}}">

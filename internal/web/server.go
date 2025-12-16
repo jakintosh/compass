@@ -41,9 +41,12 @@ func (s *Server) routes() {
 
 	// API/HTMX Routes
 	s.router.HandleFunc("POST /categories", s.handleCreateCategory)
+	s.router.HandleFunc("PATCH /categories/{id}", s.handleUpdateCategory)
+	s.router.HandleFunc("GET /categories/{id}/details", s.handleGetCategoryDetails)
 	s.router.HandleFunc("PATCH /categories/{id}/toggle-collapse", s.handleToggleCollapseCategory)
 	s.router.HandleFunc("POST /categories/{id}/tasks", s.handleCreateTask)
 	s.router.HandleFunc("PATCH /tasks/{id}", s.handleUpdateTask)
+	s.router.HandleFunc("PATCH /tasks/{id}/toggle-expand", s.handleToggleExpandTask)
 	s.router.HandleFunc("GET /tasks/{id}/details", s.handleGetTaskDetails)
 	s.router.HandleFunc("POST /tasks/{id}/subtasks", s.handleCreateSubtask)
 	s.router.HandleFunc("PATCH /subtasks/{id}", s.handleUpdateSubtask)
@@ -108,6 +111,98 @@ func (s *Server) handleToggleCollapseCategory(w http.ResponseWriter, r *http.Req
 	}
 
 	if err := s.presentation.RenderCategory(w, NewCategoryView(cat, false)); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+func (s *Server) handleUpdateCategory(w http.ResponseWriter, r *http.Request) {
+	ctx := parseRequestContext(r)
+	id := r.PathValue("id")
+	cat, err := s.store.GetCategory(id)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if name := r.FormValue("name"); name != "" {
+		cat.Name = name
+	}
+	if desc := r.FormValue("description"); desc != "" {
+		cat.Description = desc
+	}
+
+	s.store.UpdateCategory(cat)
+
+	if !ctx.IsHTMX {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+
+	// Render OOB updates for category name (in header)
+	catView := NewCategoryView(cat, true)
+	if err := s.presentation.RenderCategory(w, catView); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+func (s *Server) handleGetCategoryDetails(w http.ResponseWriter, r *http.Request) {
+	ctx := parseRequestContext(r)
+	id := r.PathValue("id")
+
+	cat, err := s.store.GetCategory(id)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+
+	if ctx.IsHTMX {
+		if err := s.presentation.RenderCategoryDetails(w, NewCategoryView(cat, false)); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+		return
+	}
+
+	// Deep Linking: Render full page with details open
+	cats, err := s.store.GetCategories()
+	if err != nil {
+		http.Error(w, "Failed to load categories", http.StatusInternalServerError)
+		return
+	}
+
+	catViews := make([]CategoryView, len(cats))
+	for i, c := range cats {
+		catViews[i] = NewCategoryView(c, false)
+	}
+
+	if err := s.presentation.RenderIndexWithDetails(w, catViews, NewCategoryView(cat, false)); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+func (s *Server) handleToggleExpandTask(w http.ResponseWriter, r *http.Request) {
+	ctx := parseRequestContext(r)
+	id := r.PathValue("id")
+	task, err := s.store.GetTask(id)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+
+	// Toggle expanded state
+	task.Expanded = !task.Expanded
+	s.store.UpdateTask(task)
+
+	if !ctx.IsHTMX {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+
+	if err := s.presentation.RenderTask(w, NewTaskView(task, false)); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }

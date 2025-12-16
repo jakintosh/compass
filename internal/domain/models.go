@@ -14,14 +14,16 @@ type Task struct {
 	Name        string     `json:"name"`
 	Description string     `json:"description"`
 	Completion  int        `json:"completion"` // 0-100, calculated if Subtasks > 0
+	Expanded    bool       `json:"expanded"`   // false = subtasks hidden
 	Subtasks    []*Subtask `json:"subtasks"`
 }
 
 type Category struct {
-	ID        string  `json:"id"`
-	Name      string  `json:"name"`
-	Tasks     []*Task `json:"tasks"`
-	Collapsed bool    `json:"collapsed"`
+	ID          string  `json:"id"`
+	Name        string  `json:"name"`
+	Description string  `json:"description"`
+	Tasks       []*Task `json:"tasks"`
+	Collapsed   bool    `json:"collapsed"`
 }
 
 // Helper methods
