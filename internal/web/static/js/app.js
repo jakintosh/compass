@@ -5,8 +5,7 @@ document.addEventListener('htmx:load', function (evt) {
         new Sortable(categoriesList, {
             animation: 150,
             draggable: '.category',
-            filter: '.btn-edit-icon',
-            preventOnFilter: false,
+            handle: '.drag-handle',
             ghostClass: 'ghost',
             onEnd: function (evt) {
                 let ids = this.toArray();
@@ -25,9 +24,8 @@ document.addEventListener('htmx:load', function (evt) {
             new Sortable(el, {
                 group: 'tasks',
                 animation: 150,
-                draggable: '.task-wrapper',
-                filter: '.btn-edit-icon, .task-slider, .range-slider, .task-right',
-                preventOnFilter: false,
+                draggable: '.task-item',
+                handle: '.drag-handle',
                 ghostClass: 'ghost',
                 onEnd: function (evt) {
                     let taskId = evt.item.getAttribute('data-id');
@@ -54,15 +52,14 @@ document.addEventListener('htmx:load', function (evt) {
             new Sortable(el, {
                 group: 'subtasks-' + el.id,
                 animation: 150,
-                draggable: '.subtask-inline',
-                filter: '.btn-edit-icon, .task-slider, .range-slider, .task-right',
-                preventOnFilter: false,
+                draggable: '.subtask',
+                handle: '.drag-handle',
                 ghostClass: 'ghost',
                 onEnd: function (evt) {
                     let taskId = el.id.replace('subtasks-list-', '');
                     let ids = [];
-                    el.querySelectorAll('[data-subtask-id]').forEach(function (item) {
-                        ids.push(item.getAttribute('data-subtask-id'));
+                    el.querySelectorAll('[data-id]').forEach(function (item) {
+                        ids.push(item.getAttribute('data-id'));
                     });
 
                     htmx.ajax('POST', '/subtasks/reorder', {

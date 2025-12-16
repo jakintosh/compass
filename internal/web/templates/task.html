@@ -11,11 +11,10 @@
     hx-swap-oob="true" {{end}}></div>
 {{end}}
 
-
-<div class="task-wrapper" id="task-{{.ID}}" data-id="{{.ID}}" {{if .OOB}} hx-swap-oob="true" {{end}}>
-    <div class="task" data-draggable hx-patch="/tasks/{{.ID}}/toggle-expand" hx-target="#task-{{.ID}}"
-        hx-swap="outerHTML">
-        <div class="drag-handle-indicator">
+<li class="task-item" id="task-{{.ID}}" data-id="{{.ID}}" {{if .OOB}} hx-swap-oob="true" {{end}}>
+    <div class="task" hx-patch="/tasks/{{.ID}}/toggle-expand" hx-target="#task-{{.ID}}" hx-swap="outerHTML">
+        <!-- Drag handle -->
+        <div class="drag-handle" onmousedown="event.stopPropagation()">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                 stroke-linecap="round" stroke-linejoin="round">
                 <circle cx="9" cy="12" r="1" />
@@ -27,57 +26,53 @@
             </svg>
         </div>
 
-        <div class="task-content">
-            <!-- Expand/collapse arrow indicator -->
-            <div class="task-expand-indicator {{if .Expanded}}expanded{{end}}">
-                <svg class="task-toggle-icon" width="14" height="14" viewBox="0 0 24 24" fill="none"
-                    stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <polyline points="6 9 12 15 18 9"></polyline>
-                </svg>
-            </div>
+        <!-- Expand/collapse arrow -->
+        <svg class="task-expand-indicator {{if .Expanded}}expanded{{end}}" width="14" height="14" viewBox="0 0 24 24"
+            fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="6 9 12 15 18 9"></polyline>
+        </svg>
 
-            <div class="task-main">
-                {{template "task_name" .}}
-                {{if and (not .Expanded) .HasSubtasks}}
-                <span class="subtask-indicator">{{len .Subtasks}}</span>
-                {{end}}
-            </div>
+        {{template "task_name" .}}
 
-            <div class="task-right" onclick="event.stopPropagation()">
-                {{if .HasSubtasks}}
-                <div class="task-progress-bar">
-                    {{template "task_progress_fill" .}}
-                </div>
-                {{else}}
-                <div class="task-slider">
-                    <input type="range" min="0" max="100" value="{{.Completion}}" class="range-slider" name="completion"
-                        hx-patch="/tasks/{{.ID}}" hx-trigger="change" hx-swap="none">
-                </div>
-                {{end}}
-                {{template "task_percent" .}}
+        {{if and (not .Expanded) .HasSubtasks}}
+        <span class="subtask-indicator">{{len .Subtasks}}</span>
+        {{end}}
 
-                <!-- Edit button -->
-                <button class="btn btn-edit-icon" hx-get="/tasks/{{.ID}}/details" hx-target="#slideover-container"
-                    hx-swap="innerHTML">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                        stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-                    </svg>
-                </button>
-            </div>
+        <span class="task-spacer"></span>
+
+        {{if .HasSubtasks}}
+        <div class="task-progress-bar">
+            {{template "task_progress_fill" .}}
         </div>
+        {{else}}
+        <div class="task-slider" onclick="event.stopPropagation()">
+            <input type="range" min="0" max="100" value="{{.Completion}}" class="range-slider" name="completion"
+                hx-patch="/tasks/{{.ID}}" hx-trigger="change" hx-swap="none">
+        </div>
+        {{end}}
+
+        {{template "task_percent" .}}
+
+        <!-- Edit button -->
+        <button class="btn btn-edit-icon" hx-get="/tasks/{{.ID}}/details" hx-target="#slideover-container"
+            hx-swap="innerHTML" onclick="event.stopPropagation()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+            </svg>
+        </button>
     </div>
 
     <!-- Subtasks section - only shown when expanded -->
     {{if .Expanded}}
-    <div id="subtasks-list-{{.ID}}" class="subtasks-inline-list">
+    <ul id="subtasks-list-{{.ID}}" class="subtasks-list">
         {{range .Subtasks}}
         {{template "subtask.html" .}}
         {{end}}
-    </div>
+    </ul>
 
-    <!-- Add subtask row (always visible when expanded, even if no subtasks yet) -->
+    <!-- Add subtask row -->
     <div class="subtask-add-row">
         <button class="btn btn-add" hx-post="/tasks/{{.ID}}/subtasks" hx-target="#subtasks-list-{{.ID}}"
             hx-swap="beforeend">
@@ -86,4 +81,4 @@
         </button>
     </div>
     {{end}}
-</div>
+</li>

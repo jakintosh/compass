@@ -180,7 +180,12 @@ body {
     align-items: center;
     gap: var(--space-md);
     margin-bottom: var(--space-lg);
-    cursor: pointer;
+    padding: var(--space-sm) 0;
+    transition: background-color var(--transition-fast);
+}
+
+.category-header:has(.drag-handle:hover) {
+    background-color: var(--color-surface);
 }
 
 .category-header:has(+ .category-content.hidden) {
@@ -242,6 +247,9 @@ body {
    Tasks List
    ========================================== */
 .tasks-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
     border-left: 1px solid var(--color-border-light);
     margin-left: var(--space-md);
     padding-left: var(--space-lg);
@@ -256,24 +264,28 @@ body {
     padding-top: var(--space-md);
 }
 
+/* Task item wrapper (li containing task row + optional subtasks) */
+.task-item {
+    list-style: none;
+}
+
 /* ==========================================
    Task Item
    ========================================== */
 .task {
     display: flex;
     align-items: center;
-    gap: var(--space-md);
+    gap: var(--space-sm);
     padding: var(--space-sm) 0;
     border-bottom: 1px solid var(--color-border-light);
     transition: background-color var(--transition-fast);
-    cursor: pointer;
 }
 
-.task-wrapper:last-of-type>.task {
+.task-item:last-of-type>.task {
     border-bottom: none;
 }
 
-.task:hover {
+.task:has(.drag-handle:hover) {
     background-color: var(--color-surface);
 }
 
@@ -291,19 +303,10 @@ body {
     color: var(--color-text);
 }
 
-.task-content {
+/* Spacer to push controls to the right */
+.task-spacer {
     flex: 1;
     min-width: 0;
-    display: flex;
-    align-items: center;
-    gap: var(--space-lg);
-}
-
-.task-main {
-    flex: 1;
-    min-width: 0;
-    display: flex;
-    align-items: center;
 }
 
 .task-name {
@@ -341,17 +344,14 @@ body {
     align-items: center;
     gap: var(--space-sm);
     width: 160px;
-    /* Fixed width */
-    margin-left: auto;
-    /* Push to right if task-content allows, but task-content has gap. Let's rely on flex logic */
 }
 
-/* Actually, let's force the right side cluster to be fixed width */
-.task-right {
+/* Task controls cluster (slider/progress, percent, edit button) */
+.task-controls {
     display: flex;
     align-items: center;
     gap: var(--space-md);
-    margin-left: auto;
+    flex-shrink: 0;
 }
 
 .task-percent {
@@ -381,33 +381,11 @@ body {
     color: var(--color-accent);
 }
 
-/* Subtask add row (non-draggable) */
+/* Subtask add row (non-draggable) - displayed as li */
 .subtask-add-row {
+    list-style: none;
     padding: var(--space-sm) 0;
     padding-left: calc(var(--space-lg) + 1.5rem);
-}
-
-/* Inline subtasks on main page */
-.subtasks-inline-list {
-    padding-left: calc(var(--space-lg) + 1.5rem);
-}
-
-.subtask-inline {
-    padding: var(--space-xs) 0;
-    border-bottom: 1px solid var(--color-border-light);
-}
-
-.subtask-inline:last-child {
-    border-bottom: none;
-}
-
-.subtask-inline .subtask-handle {
-    opacity: 0;
-    transition: opacity var(--transition-fast);
-}
-
-.subtask-inline:hover .subtask-handle {
-    opacity: 1;
 }
 
 /* ==========================================
@@ -495,6 +473,18 @@ body {
 
 .drag-handle:active {
     cursor: grabbing;
+}
+
+/* SortableJS Classes for Grabbing State */
+.sortable-chosen,
+.sortable-drag {
+    cursor: grabbing !important;
+}
+
+.category-header.sortable-chosen,
+.task.sortable-chosen,
+.subtask.sortable-chosen {
+    cursor: grabbing !important;
 }
 
 /* ==========================================
@@ -628,8 +618,12 @@ body {
 .subtask {
     display: flex;
     align-items: center;
-    gap: var(--space-md);
+    gap: var(--space-sm);
     padding: var(--space-sm) 0;
+}
+
+.subtask:has(.drag-handle:hover) {
+    background-color: var(--color-surface);
 }
 
 .subtask-handle {
@@ -663,31 +657,36 @@ body {
 }
 
 /* ==========================================
-   Inline Subtasks (Main Page)
+   Subtasks (Main Page - expanded tasks)
    ========================================== */
-.subtasks-inline-list {
+ul.subtasks-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
     margin-left: calc(var(--space-md) + 14px);
-    /* Align with task content after drag handle */
     padding-left: var(--space-lg);
     border-left: 1px solid var(--color-border-light);
 }
 
-.subtask-inline {
-    padding-left: var(--space-md);
+ul.subtasks-list .subtask {
+    padding: var(--space-xs) 0;
+    border-bottom: 1px solid var(--color-border-light);
 }
 
-/* Make subtask handle visible on hover (matches task handle) */
-.subtask-inline:hover .subtask-handle {
-    opacity: 1;
+ul.subtasks-list .subtask:last-of-type {
+    border-bottom: none;
 }
 
 .subtask-icon {
     color: var(--color-text-faint);
     margin-right: var(--space-sm);
     font-size: var(--font-size-sm);
+    flex-shrink: 0;
 }
 
-.subtask-add-row {
+/* Subtask add row (non-draggable li) */
+li.subtask-add-row {
+    list-style: none;
     margin-left: calc(var(--space-md) + 14px);
     padding-left: var(--space-lg);
     padding-top: var(--space-sm);
@@ -733,7 +732,7 @@ body {
 /* Show on hover of parent row */
 .category-header:hover .btn-edit-icon,
 .task:hover .btn-edit-icon,
-.subtask-inline:hover .btn-edit-icon {
+.subtask:hover .btn-edit-icon {
     opacity: 1;
 }
 
@@ -743,47 +742,52 @@ body {
     color: var(--color-text);
 }
 
-/* Drag Handle Indicator - visual only, shown on hover */
-.drag-handle-indicator {
-    opacity: 0;
+/* Drag Handle - always visible, interactive */
+.drag-handle {
+    cursor: grab;
     color: var(--color-text-faint);
-    transition: opacity var(--transition-fast), color var(--transition-fast);
+    transition: color var(--transition-fast);
     display: flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
+    position: relative;
 }
 
-.category-header:hover .drag-handle-indicator,
-.task:hover .drag-handle-indicator,
-.subtask-inline:hover .drag-handle-indicator {
-    opacity: 1;
+/* Expanded click target - 44px wide, full row height */
+.drag-handle::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 44px;
+    height: calc(100% + 1rem);
+    /* Extends beyond visual bounds to cover row padding */
+    min-height: 44px;
 }
 
-.drag-handle-indicator:hover {
+.drag-handle:hover {
     color: var(--color-text);
 }
 
-/* Task Expand/Collapse Indicator */
-.task-expand-indicator {
-    display: flex;
-    align-items: center;
-    flex-shrink: 0;
+.drag-handle:active {
+    cursor: grabbing;
 }
 
-.task-toggle-icon {
+/* Task Expand/Collapse Indicator - now inline SVG */
+svg.task-expand-indicator {
+    flex-shrink: 0;
     color: var(--color-text-faint);
     transition: transform var(--transition-fast), color var(--transition-fast);
     transform: rotate(-90deg);
-    /* Points right when collapsed */
 }
 
-.task-expand-indicator.expanded .task-toggle-icon {
+svg.task-expand-indicator.expanded {
     transform: rotate(0deg);
-    /* Points down when expanded */
 }
 
-.task:hover .task-toggle-icon {
+.task:hover svg.task-expand-indicator {
     color: var(--color-text);
 }
 

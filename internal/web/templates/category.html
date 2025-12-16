@@ -4,10 +4,10 @@
 {{end}}
 
 <div class="category" id="category-{{.ID}}" data-id="{{.ID}}" {{if .OOB}} hx-swap-oob="true" {{end}}>
-    <div class="category-header" data-draggable hx-patch="/categories/{{.ID}}/toggle-collapse"
-        hx-target="#category-{{.ID}}" hx-swap="outerHTML">
-        <!-- Drag handle indicator on far left (visual only) -->
-        <div class="drag-handle-indicator">
+    <div class="category-header" hx-patch="/categories/{{.ID}}/toggle-collapse" hx-target="#category-{{.ID}}"
+        hx-swap="outerHTML">
+        <!-- Drag handle -->
+        <div class="drag-handle" onmousedown="event.stopPropagation()">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                 stroke-linecap="round" stroke-linejoin="round">
                 <circle cx="9" cy="12" r="1" />
@@ -45,11 +45,11 @@
     </div>
 
     <div class="category-content {{if .Collapsed}}hidden{{end}}">
-        <div class="tasks-list" id="tasks-list-{{.ID}}" data-category-id="{{.ID}}">
+        <ul class="tasks-list" id="tasks-list-{{.ID}}" data-category-id="{{.ID}}">
             {{range .Tasks}}
             {{template "task.html" .}}
             {{end}}
-        </div>
+        </ul>
 
         <div class="tasks-footer">
             <button class="btn btn-add" hx-post="/categories/{{.ID}}/tasks" hx-target="#tasks-list-{{.ID}}"
