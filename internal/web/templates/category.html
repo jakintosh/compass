@@ -1,4 +1,9 @@
-<div class="category" id="category-{{.ID}}" data-id="{{.ID}}" {{if .Partial}} hx-swap-oob="true" {{end}}>
+{{define "category_meta"}}
+<span id="category-meta-{{.ID}}" class="category-meta" {{if .OOB}}hx-swap-oob="true" {{end}}>{{.AverageCompletion}}%
+    complete</span>
+{{end}}
+
+<div class="category" id="category-{{.ID}}" data-id="{{.ID}}" {{if .OOB}} hx-swap-oob="true" {{end}}>
     <div class="category-header">
         <!-- Drag handle on far left -->
         <div class="category-handle drag-handle handle">
@@ -18,7 +23,7 @@
             hx-patch="/categories/{{.ID}}/toggle-collapse" hx-target="#category-{{.ID}}" hx-swap="outerHTML">
             <div class="category-info">
                 <h2 class="category-name">{{.Name}}</h2>
-                <span id="category-meta-{{.ID}}" class="category-meta">{{.AverageCompletion}}% complete</span>
+                {{template "category_meta" .}}
             </div>
             <svg class="category-toggle-icon" width="16" height="16" viewBox="0 0 24 24" fill="none"
                 stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -30,34 +35,7 @@
     <div class="category-content {{if .Collapsed}}hidden{{end}}">
         <div class="tasks-list" id="tasks-list-{{.ID}}" data-category-id="{{.ID}}">
             {{range .Tasks}}
-            {{/* We need to pass TaskView logic here too?
-            .Tasks is []*domain.Task.
-            {{template "task.html" .}} passes *domain.Task.
-            Task template expects TaskView.
-            Problem: RenderIndex -> builds CategoryView, but CategoryView has *domain.Category.
-            domain.Category has .Tasks which are *domain.Task.
-            The template iteration produces *domain.Task.
-
-            FIX: I need a pipeline or method to convert *Task to TaskView inside the template,
-            OR CategoryView should wrap Tasks?
-            Wrapping tasks in Go is cleaner but laborious if struct fields are accessed.
-
-            Alternative: Define TaskView to handle receiving *domain.Task directly?
-            No, I need generic behavior.
-
-            Solution: Register a function `toTaskView`.
-            But I avoided FuncMap.
-
-            Better Solution: Use a `map` or modify `CategoryView` to have `TaskViews`.
-            CategoryView cannot just embed *domain.Category if we want to intercept collection iteration.
-
-            Let's stick to adding a method `TaskViews()` to `CategoryView` struct?
-            */}}
-            {{/* For now, let's assume I fix templates.go to handle this or use a workaround.
-            Workaround: `{{template "task.html" (toTaskView .)}}`
-            I need to register FuncMap in templates.go.
-            */}}
-            {{template "task.html" (toTaskView .)}}
+            {{template "task.html" .}}
             {{end}}
         </div>
 

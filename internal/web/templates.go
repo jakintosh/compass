@@ -1,6 +1,7 @@
 package web
 
 import (
+	"bytes"
 	"embed"
 	"fmt"
 	"html/template"
@@ -19,14 +20,7 @@ type Presentation struct {
 
 // NewPresentation creates a new Presentation layer
 func NewPresentation() (*Presentation, error) {
-	tmpl := template.New("base").Funcs(template.FuncMap{
-		"toTaskView": func(t *domain.Task) TaskView {
-			return TaskView{Task: t, Partial: false}
-		},
-		"toSubtaskView": func(s *domain.Subtask) SubtaskView {
-			return SubtaskView{Subtask: s, Partial: false}
-		},
-	})
+	tmpl := template.New("base")
 
 	tmpl, err := tmpl.ParseFS(templateFS, "templates/*.html")
 	if err != nil {
@@ -38,134 +32,225 @@ func NewPresentation() (*Presentation, error) {
 // View Models
 
 type TaskView struct {
-	*domain.Task
-	Partial bool // Render as OOB or partial update
+	ID          string
+	Name        string
+	Description string
+	Completion  int
+	Subtasks    []SubtaskView
+	OOB         bool
 }
 
 type CategoryView struct {
-	*domain.Category
-	Partial bool
+	ID                string
+	Name              string
+	AverageCompletion int
+	Collapsed         bool
+	Tasks             []TaskView
+	OOB               bool
 }
 
 type SubtaskView struct {
-	*domain.Subtask
-	Partial bool
+	ID          string
+	Name        string
+	Description string
+	Completion  int
+	OOB         bool
 }
 
 type PageView struct {
-	Categories []CategoryView
+	Categories    []CategoryView
+	ActiveDetails template.HTML // Pre-rendered details for deep linking
+}
+
+// Factories
+
+func NewSubtaskView(s *domain.Subtask, oob bool) SubtaskView {
+	return SubtaskView{
+		ID:          s.ID,
+		Name:        s.Name,
+		Description: s.Description,
+		Completion:  s.Completion,
+		OOB:         oob,
+	}
+}
+
+func NewTaskView(t *domain.Task, oob bool) TaskView {
+	view := TaskView{
+		ID:          t.ID,
+		Name:        t.Name,
+		Description: t.Description,
+		Completion:  t.Completion,
+		OOB:         oob,
+	}
+	if len(t.Subtasks) > 0 {
+		view.Subtasks = make([]SubtaskView, len(t.Subtasks))
+		for i, s := range t.Subtasks {
+			view.Subtasks[i] = NewSubtaskView(s, false)
+		}
+	}
+	return view
+}
+
+func NewCategoryView(c *domain.Category, oob bool) CategoryView {
+	view := CategoryView{
+		ID:                c.ID,
+		Name:              c.Name,
+		AverageCompletion: c.AverageCompletion(),
+		Collapsed:         c.Collapsed,
+		OOB:               oob,
+	}
+	if len(c.Tasks) > 0 {
+		view.Tasks = make([]TaskView, len(c.Tasks))
+		for i, t := range c.Tasks {
+			view.Tasks[i] = NewTaskView(t, false)
+		}
+	}
+	return view
 }
 
 // Rendering Methods
 
-func (p *Presentation) RenderIndex(w io.Writer, categories []*domain.Category) error {
-	views := make([]CategoryView, len(categories))
-	for i, c := range categories {
-		views[i] = CategoryView{Category: c, Partial: false}
-	}
-	return p.tmpl.ExecuteTemplate(w, "layout.html", PageView{Categories: views})
+func (p *Presentation) RenderIndex(w io.Writer, ctx RequestContext, categories []*domain.Category) error {
+	return p.RenderIndexWithDetails(w, ctx, categories, nil)
 }
 
-func (p *Presentation) RenderCategory(w io.Writer, category *domain.Category, partial bool) error {
-	view := CategoryView{
-		Category: category,
-		Partial:  partial,
+func (p *Presentation) RenderIndexWithDetails(w io.Writer, ctx RequestContext, categories []*domain.Category, detailsModel interface{}) error {
+	catViews := make([]CategoryView, len(categories))
+	for i, c := range categories {
+		catViews[i] = NewCategoryView(c, false)
 	}
+
+	pageView := PageView{Categories: catViews}
+
+	if detailsModel != nil {
+		var buf bytes.Buffer
+		var tmplName string
+		var viewModel any
+
+		switch v := detailsModel.(type) {
+		case *domain.Task:
+			tmplName = "details"
+			// Force conversion to View
+			viewModel = NewTaskView(v, false)
+		case *domain.Subtask:
+			tmplName = "subtask_details"
+			// Force conversion to View
+			viewModel = NewSubtaskView(v, false)
+		default:
+			return fmt.Errorf("unknown details model type: %T", v)
+		}
+
+		if err := p.tmpl.ExecuteTemplate(&buf, tmplName, viewModel); err != nil {
+			return err
+		}
+		pageView.ActiveDetails = template.HTML(buf.String())
+	}
+
+	return p.tmpl.ExecuteTemplate(w, "layout.html", pageView)
+}
+
+func (p *Presentation) RenderCategory(w io.Writer, ctx RequestContext, category *domain.Category) error {
+	view := NewCategoryView(category, false)
 	return p.tmpl.ExecuteTemplate(w, "category.html", view)
 }
 
-func (p *Presentation) RenderTask(w io.Writer, task *domain.Task, partial bool) error {
-	view := TaskView{
-		Task:    task,
-		Partial: partial,
-	}
+func (p *Presentation) RenderTask(w io.Writer, ctx RequestContext, task *domain.Task) error {
+	view := NewTaskView(task, false)
 	return p.tmpl.ExecuteTemplate(w, "task.html", view)
 }
 
-func (p *Presentation) RenderSubtask(w io.Writer, subtask *domain.Subtask, partial bool) error {
-	view := SubtaskView{
-		Subtask: subtask,
-		Partial: partial,
-	}
-	return p.tmpl.ExecuteTemplate(w, "subtask.html", view) // Was previously subtask_inline
+func (p *Presentation) RenderSubtask(w io.Writer, ctx RequestContext, subtask *domain.Subtask) error {
+	view := NewSubtaskView(subtask, false)
+	return p.tmpl.ExecuteTemplate(w, "subtask.html", view)
 }
 
-func (p *Presentation) RenderTaskUpdate(w io.Writer, task *domain.Task, cat *domain.Category) error {
+func (p *Presentation) RenderTaskUpdateOOB(w io.Writer, task *domain.Task, cat *domain.Category) error {
+	view := NewTaskView(task, true)
+
 	// 1. Task percentage text
-	// <span id="task-percent-{{.ID}}" ...>%d%%</span>
-	if err := p.tmpl.ExecuteTemplate(w, "task_percent", TaskView{Task: task, Partial: true}); err != nil {
+	if err := p.tmpl.ExecuteTemplate(w, "task_percent", view); err != nil {
 		return err
 	}
 
 	// 2. Category meta (average completion)
-	// <span id="category-meta-{{.ID}}" ...>%d%% complete</span>
-	if err := p.tmpl.ExecuteTemplate(w, "category_meta", CategoryView{Category: cat, Partial: true}); err != nil {
+	if err := p.tmpl.ExecuteTemplate(w, "category_meta", NewCategoryView(cat, true)); err != nil {
 		return err
 	}
 
-	// 3. Task Name (if changed)
-	// <h3 id="task-name-{{.ID}}" ...>{{.Name}}</h3>
-	if err := p.tmpl.ExecuteTemplate(w, "task_name", TaskView{Task: task, Partial: true}); err != nil {
+	// 3. Task Name
+	if err := p.tmpl.ExecuteTemplate(w, "task_name", view); err != nil {
 		return err
 	}
 
-	// 4. Task Progress Bar Fill (if it exists)
-	// <div id="task-progress-fill-{{.ID}}" ...></div>
-	// This was manually handled in handleUpdateSubtask for subtask updates, but handleUpdateTask only handled slider?
-	// The slider is handled by the slider input itself or replaced?
-	// In the original code `handleUpdateTask` didn't update progress bar fill, because it assumed no subtasks (slider mode).
-	// But `handleUpdateSubtask` DID update parent task progress bar.
+	// 4. Task Progress Bar Fill
+	if err := p.tmpl.ExecuteTemplate(w, "task_progress_fill", view); err != nil {
+		return err
+	}
 
-	// Let's add a method for Subtask updates which includes parent task progress bar.
 	return nil
 }
 
-func (p *Presentation) RenderSubtaskUpdate(w io.Writer, subtask *domain.Subtask, task *domain.Task, cat *domain.Category) error {
-	// 1. Task percentage text
-	if err := p.tmpl.ExecuteTemplate(w, "task_percent", TaskView{Task: task, Partial: true}); err != nil {
+func (p *Presentation) RenderSubtaskUpdateOOB(w io.Writer, subtask *domain.Subtask, task *domain.Task, cat *domain.Category) error {
+	subView := NewSubtaskView(subtask, true)
+	taskView := NewTaskView(task, true)
+
+	// 1. Parent Task percentage text
+	if err := p.tmpl.ExecuteTemplate(w, "task_percent", taskView); err != nil {
 		return err
 	}
 
-	// 2. Task Progress Bar Fill
-	if err := p.tmpl.ExecuteTemplate(w, "task_progress_fill", TaskView{Task: task, Partial: true}); err != nil {
+	// 2. Parent Task Progress Bar Fill
+	if err := p.tmpl.ExecuteTemplate(w, "task_progress_fill", taskView); err != nil {
 		return err
 	}
 
 	// 3. Category completion
 	if cat != nil {
-		if err := p.tmpl.ExecuteTemplate(w, "category_meta", CategoryView{Category: cat, Partial: true}); err != nil {
+		if err := p.tmpl.ExecuteTemplate(w, "category_meta", NewCategoryView(cat, true)); err != nil {
 			return err
 		}
 	}
 
 	// 4. Subtask Name
-	if err := p.tmpl.ExecuteTemplate(w, "subtask_name", SubtaskView{Subtask: subtask, Partial: true}); err != nil {
+	if err := p.tmpl.ExecuteTemplate(w, "subtask_name", subView); err != nil {
 		return err
 	}
 
 	// 5. Subtask percentage
-	if err := p.tmpl.ExecuteTemplate(w, "subtask_percent", SubtaskView{Subtask: subtask, Partial: true}); err != nil {
+	if err := p.tmpl.ExecuteTemplate(w, "subtask_percent", subView); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (p *Presentation) RenderSubtaskCreated(w io.Writer, subtask *domain.Subtask, task *domain.Task) error {
-	// 1. Render the new subtask (for the requesting list, e.g. slideover)
-	if err := p.RenderSubtask(w, subtask, false); err != nil {
+func (p *Presentation) RenderSubtaskCreatedOOB(w io.Writer, subtask *domain.Subtask, task *domain.Task) error {
+	// 1. Render the new subtask (standard, not OOB)
+	if err := p.RenderSubtask(w, RequestContext{IsHTMX: true}, subtask); err != nil {
 		return err
 	}
 
-	// 2. Re-render the Main Page Task to show the new subtask inline and update progress
-	// Partial=true triggers OOB swap
-	return p.RenderTask(w, task, true)
+	// 2. Update Parent Task (OOB) to show new progress etc.
+	return p.RenderTaskForUpdate(w, task)
 }
 
-func (p *Presentation) RenderSubtaskDetails(w io.Writer, subtask *domain.Subtask) error {
-	return p.tmpl.ExecuteTemplate(w, "subtask_details", subtask) // Details templates might not need wrapping yet?
+func (p *Presentation) RenderTaskForUpdate(w io.Writer, task *domain.Task) error {
+	return p.tmpl.ExecuteTemplate(w, "task.html", NewTaskView(task, true))
 }
 
-func (p *Presentation) RenderTaskDetails(w io.Writer, task *domain.Task) error {
-	return p.tmpl.ExecuteTemplate(w, "details", task)
+func (p *Presentation) RenderSubtaskDetails(w io.Writer, ctx RequestContext, subtask *domain.Subtask) error {
+	// With strict boundary, we convert to View here too.
+	if ctx.IsHTMX {
+		view := NewSubtaskView(subtask, false)
+		return p.tmpl.ExecuteTemplate(w, "subtask_details", view)
+	}
+	return nil
+}
+
+func (p *Presentation) RenderTaskDetails(w io.Writer, ctx RequestContext, task *domain.Task) error {
+	if ctx.IsHTMX {
+		view := NewTaskView(task, false)
+		return p.tmpl.ExecuteTemplate(w, "details", view)
+	}
+	return nil
 }

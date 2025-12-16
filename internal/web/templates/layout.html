@@ -15,7 +15,11 @@
 <body>
     {{template "content" .}}
 
-    <div id="slideover-container"></div>
+    <div id="slideover-container">
+        {{if .ActiveDetails}}
+        {{.ActiveDetails}}
+        {{end}}
+    </div>
 
     <script src="/static/js/app.js"></script>
 </body>

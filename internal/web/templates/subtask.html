@@ -1,4 +1,12 @@
-<div class="task subtask-inline" data-subtask-id="{{.ID}}" {{if .Partial}} hx-swap-oob="true" {{end}}>
+{{define "subtask_name"}}
+<span id="subtask-name-{{.ID}}" class="task-name" {{if .OOB}} hx-swap-oob="true" {{end}}>{{.Name}}</span>
+{{end}}
+
+{{define "subtask_percent"}}
+<span id="subtask-percent-{{.ID}}" class="task-percent" {{if .OOB}} hx-swap-oob="true" {{end}}>{{.Completion}}%</span>
+{{end}}
+
+<div class="task subtask-inline" data-subtask-id="{{.ID}}" {{if .OOB}} hx-swap-oob="true" {{end}}>
     <!-- Subtask Drag Handle -->
     <div class="subtask-handle drag-handle">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
@@ -16,7 +24,7 @@
         <span class="subtask-icon">↳</span>
 
         <div class="task-main" hx-get="/subtasks/{{.ID}}/details" hx-target="#slideover-container" hx-swap="innerHTML">
-            <span id="subtask-name-{{.ID}}" class="task-name">{{.Name}}</span>
+            {{template "subtask_name" .}}
         </div>
 
         <div class="task-right">
@@ -24,7 +32,7 @@
                 <input type="range" min="0" max="100" value="{{.Completion}}" class="range-slider" name="completion"
                     hx-patch="/subtasks/{{.ID}}" hx-trigger="change" hx-swap="none">
             </div>
-            <span id="subtask-percent-{{.ID}}" class="task-percent">{{.Completion}}%</span>
+            {{template "subtask_percent" .}}
             <!-- Spacer to align with parent task's + button -->
             <div class="btn-spacer"></div>
         </div>

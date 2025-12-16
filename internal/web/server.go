@@ -37,7 +37,7 @@ func (s *Server) routes() {
 	s.router.Handle("/static/", http.StripPrefix("/static/", fs))
 
 	// Page Routes
-	s.router.HandleFunc("/", s.handleIndex)
+	s.router.HandleFunc("GET /{$}", s.handleIndex)
 
 	// API/HTMX Routes
 	s.router.HandleFunc("POST /categories", s.handleCreateCategory)
@@ -51,35 +51,42 @@ func (s *Server) routes() {
 	s.router.HandleFunc("POST /tasks/move", s.handleMoveTask)
 	s.router.HandleFunc("GET /subtasks/{id}/details", s.handleGetSubtaskDetails)
 	s.router.HandleFunc("POST /subtasks/reorder", s.handleReorderSubtasks)
-
 }
 
 func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
+	ctx := parseRequestContext(r)
 	cats, err := s.store.GetCategories()
 	if err != nil {
 		http.Error(w, "Failed to load categories", http.StatusInternalServerError)
 		return
 	}
 
-	if err := s.presentation.RenderIndex(w, cats); err != nil {
+	if err := s.presentation.RenderIndex(w, ctx, cats); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
 
 func (s *Server) handleCreateCategory(w http.ResponseWriter, r *http.Request) {
+	ctx := parseRequestContext(r)
 	cat, err := s.store.AddCategory("New Category")
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	if err := s.presentation.RenderCategory(w, cat, false); err != nil {
+	if !ctx.IsHTMX {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+
+	if err := s.presentation.RenderCategory(w, ctx, cat); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
 
 func (s *Server) handleToggleCollapseCategory(w http.ResponseWriter, r *http.Request) {
-	id := r.PathValue("id") // Go 1.22+ routing
+	ctx := parseRequestContext(r)
+	id := r.PathValue("id")
 	cat, err := s.store.GetCategory(id)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
@@ -90,13 +97,18 @@ func (s *Server) handleToggleCollapseCategory(w http.ResponseWriter, r *http.Req
 	cat.Collapsed = !cat.Collapsed
 	s.store.UpdateCategory(cat)
 
-	// Return updated category (HTMX will swap outerHTML)
-	if err := s.presentation.RenderCategory(w, cat, false); err != nil {
+	if !ctx.IsHTMX {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+
+	if err := s.presentation.RenderCategory(w, ctx, cat); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
 
 func (s *Server) handleCreateTask(w http.ResponseWriter, r *http.Request) {
+	ctx := parseRequestContext(r)
 	catID := r.PathValue("id")
 	task, err := s.store.AddTask(catID, "New Task")
 	if err != nil {
@@ -104,12 +116,18 @@ func (s *Server) handleCreateTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := s.presentation.RenderTask(w, task, false); err != nil {
+	if !ctx.IsHTMX {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+
+	if err := s.presentation.RenderTask(w, ctx, task); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
 
 func (s *Server) handleUpdateTask(w http.ResponseWriter, r *http.Request) {
+	ctx := parseRequestContext(r)
 	id := r.PathValue("id")
 	task, err := s.store.GetTask(id)
 	if err != nil {
@@ -137,6 +155,11 @@ func (s *Server) handleUpdateTask(w http.ResponseWriter, r *http.Request) {
 
 	s.store.UpdateTask(task)
 
+	if !ctx.IsHTMX {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+
 	// Re-fetch category for average completion
 	cat, err := s.store.GetCategory(task.CategoryID)
 	if err != nil {
@@ -144,42 +167,78 @@ func (s *Server) handleUpdateTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := s.presentation.RenderTaskUpdate(w, task, cat); err != nil {
+	if err := s.presentation.RenderTaskUpdateOOB(w, task, cat); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
 
 func (s *Server) handleGetSubtaskDetails(w http.ResponseWriter, r *http.Request) {
+	ctx := parseRequestContext(r)
 	id := r.PathValue("id")
+
 	sub, err := s.store.GetSubtask(id)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
 
-	if err := s.presentation.RenderSubtaskDetails(w, sub); err != nil {
+	if ctx.IsHTMX {
+		if err := s.presentation.RenderSubtaskDetails(w, ctx, sub); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+		return
+	}
+
+	// Deep Linking: Render full page with details open
+	cats, err := s.store.GetCategories()
+	if err != nil {
+		http.Error(w, "Failed to load categories", http.StatusInternalServerError)
+		return
+	}
+	if err := s.presentation.RenderIndexWithDetails(w, ctx, cats, sub); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
 
 func (s *Server) handleGetTaskDetails(w http.ResponseWriter, r *http.Request) {
+	ctx := parseRequestContext(r)
 	id := r.PathValue("id")
+
 	task, err := s.store.GetTask(id)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
 
-	if err := s.presentation.RenderTaskDetails(w, task); err != nil {
+	if !ctx.IsHTMX {
+		if err := s.presentation.RenderTaskDetails(w, ctx, task); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+		return
+	}
+
+	// Deep Linking: Render full page with details open
+	cats, err := s.store.GetCategories()
+	if err != nil {
+		http.Error(w, "Failed to load categories", http.StatusInternalServerError)
+		return
+	}
+	if err := s.presentation.RenderIndexWithDetails(w, ctx, cats, task); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
 
 func (s *Server) handleCreateSubtask(w http.ResponseWriter, r *http.Request) {
+	ctx := parseRequestContext(r)
 	taskID := r.PathValue("id")
 	sub, err := s.store.AddSubtask(taskID, "New Subtask")
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if !ctx.IsHTMX {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
 	}
 
@@ -190,12 +249,13 @@ func (s *Server) handleCreateSubtask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := s.presentation.RenderSubtaskCreated(w, sub, task); err != nil {
+	if err := s.presentation.RenderSubtaskCreatedOOB(w, sub, task); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
 
 func (s *Server) handleUpdateSubtask(w http.ResponseWriter, r *http.Request) {
+	ctx := parseRequestContext(r)
 	id := r.PathValue("id")
 	sub, err := s.store.GetSubtask(id)
 	if err != nil {
@@ -223,6 +283,11 @@ func (s *Server) handleUpdateSubtask(w http.ResponseWriter, r *http.Request) {
 
 	s.store.UpdateSubtask(sub)
 
+	if !ctx.IsHTMX {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+
 	// Fetch necessary data for updates
 	taskID := sub.TaskID
 	if taskID == "" {
@@ -246,13 +311,14 @@ func (s *Server) handleUpdateSubtask(w http.ResponseWriter, r *http.Request) {
 
 	// Render updates
 	if task != nil {
-		if err := s.presentation.RenderSubtaskUpdate(w, sub, task, cat); err != nil {
+		if err := s.presentation.RenderSubtaskUpdateOOB(w, sub, task, cat); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 	}
 }
 
 func (s *Server) handleReorderCategories(w http.ResponseWriter, r *http.Request) {
+	ctx := parseRequestContext(r)
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -267,10 +333,16 @@ func (s *Server) handleReorderCategories(w http.ResponseWriter, r *http.Request)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+
+	if !ctx.IsHTMX {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
 	w.WriteHeader(http.StatusOK)
 }
 
 func (s *Server) handleMoveTask(w http.ResponseWriter, r *http.Request) {
+	ctx := parseRequestContext(r)
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -290,10 +362,16 @@ func (s *Server) handleMoveTask(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+
+	if !ctx.IsHTMX {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
 	w.WriteHeader(http.StatusOK)
 }
 
 func (s *Server) handleReorderSubtasks(w http.ResponseWriter, r *http.Request) {
+	ctx := parseRequestContext(r)
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -304,6 +382,11 @@ func (s *Server) handleReorderSubtasks(w http.ResponseWriter, r *http.Request) {
 
 	if err := s.store.ReorderSubtasks(taskID, ids); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if !ctx.IsHTMX {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
 	}
 	w.WriteHeader(http.StatusOK)

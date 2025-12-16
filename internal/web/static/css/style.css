@@ -182,6 +182,10 @@ body {
     margin-bottom: var(--space-lg);
 }
 
+.category-header:has(+ .category-content.hidden) {
+    margin-bottom: 0;
+}
+
 .category-handle {
     opacity: 0;
     color: var(--color-text-faint);

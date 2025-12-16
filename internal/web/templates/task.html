@@ -1,4 +1,18 @@
-<div class="task-wrapper" id="task-{{.ID}}" data-id="{{.ID}}" {{if .Partial}} hx-swap-oob="true" {{end}}>
+{{define "task_name"}}
+<h3 id="task-name-{{.ID}}" class="task-name" {{if .OOB}} hx-swap-oob="true" {{end}}>{{.Name}}</h3>
+{{end}}
+
+{{define "task_percent"}}
+<span id="task-percent-{{.ID}}" class="task-percent" {{if .OOB}} hx-swap-oob="true" {{end}}>{{.Completion}}%</span>
+{{end}}
+
+{{define "task_progress_fill"}}
+<div id="task-progress-fill-{{.ID}}" class="task-progress-fill" style="width: {{.Completion}}%" {{if .OOB}}
+    hx-swap-oob="true" {{end}}></div>
+{{end}}
+
+
+<div class="task-wrapper" id="task-{{.ID}}" data-id="{{.ID}}" {{if .OOB}} hx-swap-oob="true" {{end}}>
     <div class="task">
         <div class="task-handle drag-handle">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
@@ -14,14 +28,13 @@
 
         <div class="task-content">
             <div class="task-main" hx-get="/tasks/{{.ID}}/details" hx-target="#slideover-container" hx-swap="innerHTML">
-                <h3 id="task-name-{{.ID}}" class="task-name">{{.Name}}</h3>
+                {{template "task_name" .}}
             </div>
 
             <div class="task-right">
                 {{if .Subtasks}}
                 <div class="task-progress-bar">
-                    <div id="task-progress-fill-{{.ID}}" class="task-progress-fill" style="width: {{.Completion}}%">
-                    </div>
+                    {{template "task_progress_fill" .}}
                 </div>
                 {{else}}
                 <div class="task-slider">
@@ -29,7 +42,7 @@
                         hx-patch="/tasks/{{.ID}}" hx-trigger="change" hx-swap="none">
                 </div>
                 {{end}}
-                <span id="task-percent-{{.ID}}" class="task-percent">{{.Completion}}%</span>
+                {{template "task_percent" .}}
                 <button class="btn btn-icon-sm" hx-post="/tasks/{{.ID}}/subtasks" hx-target="#task-{{.ID}}"
                     hx-swap="outerHTML">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
@@ -47,7 +60,7 @@
     <!-- ID used for Sortable -->
     <div id="subtasks-list-{{.ID}}" class="subtasks-inline-list">
         {{range .Subtasks}}
-        {{template "subtask.html" (toSubtaskView .)}}
+        {{template "subtask.html" .}}
         {{end}}
     </div>
 
