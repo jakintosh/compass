@@ -70,15 +70,12 @@
         {{range .Subtasks}}
         {{template "subtask.html" .}}
         {{end}}
+        <li class="subtask-add-item">
+            <button class="btn btn-add" hx-post="/tasks/{{.ID}}/subtasks" hx-target="closest li" hx-swap="beforebegin">
+                <span class="arrow">→</span>
+                <span>Add a subtask</span>
+            </button>
+        </li>
     </ul>
-
-    <!-- Add subtask row -->
-    <div class="subtask-add-row">
-        <button class="btn btn-add" hx-post="/tasks/{{.ID}}/subtasks" hx-target="#subtasks-list-{{.ID}}"
-            hx-swap="beforeend">
-            <span class="arrow">→</span>
-            <span>Add a subtask</span>
-        </button>
-    </div>
     {{end}}
 </li>

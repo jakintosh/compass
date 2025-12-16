@@ -141,6 +141,8 @@ body {
 .btn-add .arrow {
     display: inline-block;
     transition: transform var(--transition-fast);
+    width: 14px;
+    text-align: center;
 }
 
 .btn-add:hover .arrow {
@@ -260,9 +262,7 @@ body {
     display: none;
 }
 
-.tasks-footer {
-    padding-top: var(--space-md);
-}
+
 
 /* Task item wrapper (li containing task row + optional subtasks) */
 .task-item {
@@ -382,10 +382,19 @@ body {
 }
 
 /* Subtask add row (non-draggable) - displayed as li */
-.subtask-add-row {
+.subtask-add-item,
+.task-add-item {
     list-style: none;
     padding: var(--space-sm) 0;
-    padding-left: calc(var(--space-lg) + 1.5rem);
+    /* Indent to align with text (Handle + Gap + Icon/Arrow + Gap) */
+    padding-left: calc(14px + var(--space-sm));
+    opacity: 0.7;
+    transition: opacity 0.2s;
+}
+
+.subtask-add-item:hover,
+.task-add-item:hover {
+    opacity: 1;
 }
 
 /* ==========================================
@@ -679,18 +688,15 @@ ul.subtasks-list .subtask:last-of-type {
 
 .subtask-icon {
     color: var(--color-text-faint);
-    margin-right: var(--space-sm);
+    /* margin-right: var(--space-sm); <- Removed for alignment */
     font-size: var(--font-size-sm);
     flex-shrink: 0;
+    width: 14px;
+    text-align: center;
 }
 
 /* Subtask add row (non-draggable li) */
-li.subtask-add-row {
-    list-style: none;
-    margin-left: calc(var(--space-md) + 14px);
-    padding-left: var(--space-lg);
-    padding-top: var(--space-sm);
-}
+
 
 /* ==========================================
    Drag & Drop States

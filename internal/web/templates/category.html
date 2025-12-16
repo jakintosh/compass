@@ -49,14 +49,18 @@
             {{range .Tasks}}
             {{template "task.html" .}}
             {{end}}
+
+
+            <li class="task-add-item">
+                <button class="btn btn-add" hx-post="/categories/{{.ID}}/tasks" hx-target="closest li"
+                    hx-swap="beforebegin">
+                    <span class="arrow">→</span>
+                    <span>Add a task</span>
+                </button>
+            </li>
         </ul>
 
-        <div class="tasks-footer">
-            <button class="btn btn-add" hx-post="/categories/{{.ID}}/tasks" hx-target="#tasks-list-{{.ID}}"
-                hx-swap="beforeend">
-                <span class="arrow">→</span>
-                <span>Add a task</span>
-            </button>
-        </div>
+        <!-- Removed tasks-footer -->
+        <div class="tasks-footer" style="display: none;"></div>
     </div>
 </div>

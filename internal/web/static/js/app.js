@@ -27,6 +27,9 @@ document.addEventListener('htmx:load', function (evt) {
                 draggable: '.task-item',
                 handle: '.drag-handle',
                 ghostClass: 'ghost',
+                onMove: function (evt) {
+                    return !evt.related.classList.contains('task-add-item');
+                },
                 onEnd: function (evt) {
                     let taskId = evt.item.getAttribute('data-id');
                     let toCatId = evt.to.getAttribute('data-category-id');
@@ -55,6 +58,9 @@ document.addEventListener('htmx:load', function (evt) {
                 draggable: '.subtask',
                 handle: '.drag-handle',
                 ghostClass: 'ghost',
+                onMove: function (evt) {
+                    return !evt.related.classList.contains('subtask-add-item');
+                },
                 onEnd: function (evt) {
                     let taskId = el.id.replace('subtasks-list-', '');
                     let ids = [];
