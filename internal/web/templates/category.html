@@ -3,7 +3,7 @@
     complete</span>
 {{end}}
 
-<div class="category" id="category-{{.ID}}" data-id="{{.ID}}" {{if .OOB}} hx-swap-oob="true" {{end}}>
+<li class="category" id="category-{{.ID}}" data-id="{{.ID}}" {{if .OOB}} hx-swap-oob="true" {{end}}>
     <div class="category-header" hx-patch="/categories/{{.ID}}/toggle-collapse" hx-target="#category-{{.ID}}"
         hx-swap="outerHTML">
         <!-- Drag handle -->
@@ -44,23 +44,17 @@
         </button>
     </div>
 
-    <div class="category-content {{if .Collapsed}}hidden{{end}}">
-        <ul class="tasks-list" id="tasks-list-{{.ID}}" data-category-id="{{.ID}}">
-            {{range .Tasks}}
-            {{template "task.html" .}}
-            {{end}}
+    <ul class="tasks-list {{if .Collapsed}}hidden{{end}}" id="tasks-list-{{.ID}}" data-category-id="{{.ID}}">
+        {{range .Tasks}}
+        {{template "task.html" .}}
+        {{end}}
 
-
-            <li class="task-add-item">
-                <button class="btn btn-add" hx-post="/categories/{{.ID}}/tasks" hx-target="closest li"
-                    hx-swap="beforebegin">
-                    <span class="arrow">→</span>
-                    <span>Add a task</span>
-                </button>
-            </li>
-        </ul>
-
-        <!-- Removed tasks-footer -->
-        <div class="tasks-footer" style="display: none;"></div>
-    </div>
-</div>
+        <li class="task-add-item">
+            <button class="btn btn-add" hx-post="/categories/{{.ID}}/tasks" hx-target="closest li"
+                hx-swap="beforebegin">
+                <span class="arrow">→</span>
+                <span>Add a task</span>
+            </button>
+        </li>
+    </ul>
+</li>

@@ -8,10 +8,10 @@
         </button>
     </header>
 
-    <div id="categories-list" class="content-scroll categories-list">
+    <ul id="categories-list" class="content-scroll categories-list">
         {{range .Categories}}
         {{template "category.html" .}}
         {{end}}
-    </div>
+    </ul>
 </div>
 {{end}}
