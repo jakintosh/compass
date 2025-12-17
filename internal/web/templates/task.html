@@ -12,7 +12,7 @@
 {{end}}
 
 <li class="task-item" id="task-{{.ID}}" data-id="{{.ID}}" {{if .OOB}} hx-swap-oob="true" {{end}}>
-    <div class="task" hx-patch="/tasks/{{.ID}}/toggle-expand" hx-target="#task-{{.ID}}" hx-swap="outerHTML">
+    <div class="task">
         <!-- Drag handle -->
         <div class="drag-handle" onmousedown="event.stopPropagation()">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
@@ -26,11 +26,15 @@
             </svg>
         </div>
 
-        <!-- Expand/collapse arrow -->
-        <svg class="task-expand-indicator {{if .Expanded}}expanded{{end}}" width="14" height="14" viewBox="0 0 24 24"
-            fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="6 9 12 15 18 9"></polyline>
-        </svg>
+        <!-- Expand/collapse arrow (clickable toggle button) -->
+        <button type="button" class="expand-toggle-btn {{if .Expanded}}expanded{{end}}"
+            hx-patch="/tasks/{{.ID}}/toggle-expand" hx-target="#task-{{.ID}}" hx-swap="outerHTML">
+            <svg class="task-expand-indicator {{if .Expanded}}expanded{{end}}" width="14" height="14"
+                viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                stroke-linejoin="round">
+                <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
+        </button>
 
         {{template "task_name" .}}
 

@@ -186,7 +186,6 @@ body {
 
 .category-header {
     display: flex;
-    align-items: center;
     gap: var(--space-md);
     margin-bottom: var(--space-lg);
     padding: var(--space-sm) 0;
@@ -213,25 +212,6 @@ body {
 
 .category-handle:hover {
     color: var(--color-text);
-}
-
-.category-expand-indicator {
-    display: flex;
-    align-items: center;
-    flex-shrink: 0;
-}
-
-.category-toggle-icon {
-    color: var(--color-text-faint);
-    transition: transform var(--transition-fast), color var(--transition-fast);
-}
-
-.category-header:hover .category-toggle-icon {
-    color: var(--color-text);
-}
-
-.category-expand-indicator.collapsed .category-toggle-icon {
-    transform: rotate(-90deg);
 }
 
 .category-info {
@@ -281,11 +261,14 @@ body {
    ========================================== */
 .task {
     display: flex;
-    align-items: center;
     gap: var(--space-sm);
     padding: var(--space-sm) 0;
     border-bottom: 1px solid var(--color-border-light);
     transition: background-color var(--transition-fast);
+}
+
+.task>*:not(.drag-handle, .expand-toggle-btn) {
+    margin-block: auto;
 }
 
 .task-item:last-of-type>.task {
@@ -474,6 +457,7 @@ body {
 /* ==========================================
    Drag Handle
    ========================================== */
+
 .drag-handle {
     cursor: grab;
     color: var(--color-text-faint);
@@ -481,14 +465,27 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
+    flex-shrink: 0;
+    position: relative;
 }
 
-.drag-handle:hover {
-    color: var(--color-text);
+.drag-handle::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 0%;
 }
 
-.drag-handle:active {
-    cursor: grabbing;
+.category-header .drag-handle::before {
+    height: calc(100% + calc(var(--space-sm) * 2));
+    width: calc(100% + var(--space-md) + calc(var(--space-md) / 2));
+    transform: translate(calc(-1 * var(--space-md)), -50%);
+}
+
+.task-item .drag-handle::before {
+    height: calc(100% + calc(var(--space-sm) * 2));
+    width: calc(100% + var(--space-md) + calc(var(--space-sm) / 2));
+    transform: translate(calc(-1 * var(--space-md)), -50%);
 }
 
 /* SortableJS Classes for Grabbing State */
@@ -741,11 +738,17 @@ body {
     color: var(--color-text);
 }
 
-/* Drag Handle - always visible, interactive */
-.drag-handle {
-    cursor: grab;
-    color: var(--color-text-faint);
-    transition: color var(--transition-fast);
+
+
+/* ==========================================
+   Expand Toggle Button (for categories and tasks)
+   ========================================== */
+.expand-toggle-btn {
+    background: none;
+    border: none;
+    padding: 0;
+    margin: 0;
+    cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -753,25 +756,39 @@ body {
     position: relative;
 }
 
-/* Expanded click target - 44px wide, full row height */
-.drag-handle::before {
+/* Expanded click target - extends to the right only to avoid overlap with drag handle */
+.expand-toggle-btn::before {
     content: '';
     position: absolute;
     top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 44px;
-    height: calc(100% + 1rem);
-    /* Extends beyond visual bounds to cover row padding */
-    min-height: 44px;
+    left: 0;
 }
 
-.drag-handle:hover {
+.category-header .expand-toggle-btn::before {
+    width: calc(100% + var(--space-md) + calc(var(--space-md) / 2));
+    height: calc(100% + calc(2 * var(--space-sm)));
+    transform: translate(calc(-0.5 * var(--space-md)), -50%);
+}
+
+.task .expand-toggle-btn::before {
+    width: calc(100% + var(--space-sm) + calc(var(--space-sm) / 2));
+    height: calc(100% + calc(2 * var(--space-sm)));
+    transform: translate(calc(-0.5 * var(--space-sm)), -50%);
+}
+
+/* Category toggle icon styling */
+.expand-toggle-btn .category-toggle-icon {
+    color: var(--color-text-faint);
+    transition: transform var(--transition-fast), color var(--transition-fast);
+}
+
+.expand-toggle-btn.collapsed .category-toggle-icon {
+    transform: rotate(-90deg);
+}
+
+.expand-toggle-btn:hover .category-toggle-icon,
+.category-header:hover .expand-toggle-btn .category-toggle-icon {
     color: var(--color-text);
-}
-
-.drag-handle:active {
-    cursor: grabbing;
 }
 
 /* Task Expand/Collapse Indicator - now inline SVG */
@@ -786,7 +803,8 @@ svg.task-expand-indicator.expanded {
     transform: rotate(0deg);
 }
 
-.task:hover svg.task-expand-indicator {
+.task:hover svg.task-expand-indicator,
+.expand-toggle-btn:hover svg.task-expand-indicator {
     color: var(--color-text);
 }
 

@@ -4,8 +4,7 @@
 {{end}}
 
 <li class="category" id="category-{{.ID}}" data-id="{{.ID}}" {{if .OOB}} hx-swap-oob="true" {{end}}>
-    <div class="category-header" hx-patch="/categories/{{.ID}}/toggle-collapse" hx-target="#category-{{.ID}}"
-        hx-swap="outerHTML">
+    <div class="category-header">
         <!-- Drag handle -->
         <div class="drag-handle" onmousedown="event.stopPropagation()">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
@@ -19,13 +18,14 @@
             </svg>
         </div>
 
-        <!-- Collapse/expand arrow indicator (left of title, like tasks) -->
-        <div class="category-expand-indicator {{if .Collapsed}}collapsed{{end}}">
+        <!-- Collapse/expand arrow indicator (clickable toggle button) -->
+        <button type="button" class="expand-toggle-btn {{if .Collapsed}}collapsed{{end}}"
+            hx-patch="/categories/{{.ID}}/toggle-collapse" hx-target="#category-{{.ID}}" hx-swap="outerHTML">
             <svg class="category-toggle-icon" width="16" height="16" viewBox="0 0 24 24" fill="none"
                 stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <polyline points="6 9 12 15 18 9"></polyline>
             </svg>
-        </div>
+        </button>
 
         <!-- Category info -->
         <div class="category-info">
