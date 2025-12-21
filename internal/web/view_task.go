@@ -8,14 +8,15 @@ import (
 
 // TaskView is the view model for Task
 type TaskView struct {
-	ID          string
-	Name        string
-	Description string
-	Completion  int
-	Expanded    bool
-	HasSubtasks bool
-	Subtasks    []SubtaskView
-	OOB         bool
+	ID           string
+	Name         string
+	Description  string
+	Completion   int
+	Expanded     bool
+	HasSubtasks  bool
+	Subtasks     []SubtaskView
+	OOB          bool
+	DeleteButton DeleteButtonView
 }
 
 // NewTaskView creates a TaskView from a domain Task
@@ -35,6 +36,13 @@ func NewTaskView(t *domain.Task, oob bool) TaskView {
 			view.Subtasks[i] = NewSubtaskView(s, false)
 		}
 	}
+
+	view.DeleteButton = DeleteButtonView{
+		URL:            "/tasks/" + t.ID,
+		ConfirmMessage: "Delete this task?",
+		ButtonText:     "Delete Task",
+	}
+
 	return view
 }
 
@@ -76,4 +84,12 @@ func (p *Presentation) RenderTaskUpdateOOB(w io.Writer, taskView TaskView, catVi
 // RenderTaskForUpdate renders a task with OOB enabled for updates
 func (p *Presentation) RenderTaskForUpdate(w io.Writer, view TaskView) error {
 	return p.tmpl.ExecuteTemplate(w, "task.html", view)
+}
+
+// RenderTaskDeleteOOB renders OOB updates for task deletion
+func (p *Presentation) RenderTaskDeleteOOB(w io.Writer, id string) error {
+	if err := p.RenderSlideoverClear(w); err != nil {
+		return err
+	}
+	return p.tmpl.ExecuteTemplate(w, "task_delete", DeleteOOBView{ID: id})
 }

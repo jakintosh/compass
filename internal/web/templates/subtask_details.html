@@ -1,5 +1,5 @@
 {{define "subtask_details"}}
-<div class="slideover" onclick="event.stopPropagation()">
+<div class="slideover">
     <div class="slideover-header">
         <h2 class="slideover-title">Subtask Details</h2>
         <button class="btn slideover-close" onclick="document.getElementById('slideover-container').innerHTML = ''">
@@ -12,28 +12,18 @@
     </div>
 
     <div class="slideover-body">
-        <div class="form-field">
+        <form class="form-field">
             <label class="field-label">Name</label>
             <input type="text" value="{{.Name}}" class="field-input" hx-patch="/subtasks/{{.ID}}" hx-trigger="change"
                 name="name" hx-swap="none" onkeydown="if(event.key=='Enter') this.blur()">
-        </div>
-
-        <div class="form-field">
+        </form>
+        <form class="form-field">
             <label class="field-label">Description</label>
             <textarea rows="3" class="field-textarea" placeholder="Add a description..." hx-patch="/subtasks/{{.ID}}"
                 hx-trigger="change" name="description" hx-swap="none"
                 onkeydown="if(event.key=='Enter') this.blur()">{{.Description}}</textarea>
-        </div>
-
-        <div class="form-field">
-            <div class="subtask-slider-container">
-                <label class="field-label">Completion</label>
-                <div class="subtask-slider" style="margin-top: 0.5rem; width: 100%;">
-                    <input type="range" min="0" max="100" value="{{.Completion}}" class="range-slider" name="completion"
-                        hx-patch="/subtasks/{{.ID}}" hx-trigger="change" hx-swap="none">
-                </div>
-            </div>
-        </div>
+        </form>
+        {{template "delete_button" .DeleteButton}}
     </div>
 </div>
 {{end}}

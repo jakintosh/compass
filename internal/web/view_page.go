@@ -10,6 +10,11 @@ import (
 type PageView struct {
 	Categories    []CategoryView
 	ActiveDetails template.HTML // Pre-rendered details for deep linking
+	OOB           bool          // Always false for full page renders
+}
+
+type DeleteOOBView struct {
+	ID string
 }
 
 func (p *Presentation) RenderIndex(w io.Writer, categories []CategoryView) error {
@@ -39,4 +44,12 @@ func (p *Presentation) RenderIndexWithDetails(w io.Writer, categories []Category
 	}
 
 	return p.tmpl.ExecuteTemplate(w, "layout.html", pageView)
+}
+
+func (p *Presentation) RenderSlideoverClear(w io.Writer) error {
+	view := PageView{
+		ActiveDetails: "",
+		OOB:           true,
+	}
+	return p.tmpl.ExecuteTemplate(w, "slideover_container", view)
 }

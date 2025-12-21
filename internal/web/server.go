@@ -54,6 +54,9 @@ func (s *Server) routes() {
 	s.router.HandleFunc("POST /tasks/move", s.handleMoveTask)
 	s.router.HandleFunc("GET /subtasks/{id}/details", s.handleGetSubtaskDetails)
 	s.router.HandleFunc("POST /subtasks/reorder", s.handleReorderSubtasks)
+	s.router.HandleFunc("DELETE /categories/{id}", s.handleDeleteCategory)
+	s.router.HandleFunc("DELETE /tasks/{id}", s.handleDeleteTask)
+	s.router.HandleFunc("DELETE /subtasks/{id}", s.handleDeleteSubtask)
 }
 
 func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
@@ -518,4 +521,58 @@ func (s *Server) handleReorderSubtasks(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusOK)
+}
+
+func (s *Server) handleDeleteCategory(w http.ResponseWriter, r *http.Request) {
+	ctx := parseRequestContext(r)
+	id := r.PathValue("id")
+	if err := s.store.DeleteCategory(id); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if !ctx.IsHTMX {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+
+	if err := s.presentation.RenderCategoryDeleteOOB(w, id); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+func (s *Server) handleDeleteTask(w http.ResponseWriter, r *http.Request) {
+	ctx := parseRequestContext(r)
+	id := r.PathValue("id")
+	if err := s.store.DeleteTask(id); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if !ctx.IsHTMX {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+
+	if err := s.presentation.RenderTaskDeleteOOB(w, id); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+func (s *Server) handleDeleteSubtask(w http.ResponseWriter, r *http.Request) {
+	ctx := parseRequestContext(r)
+	id := r.PathValue("id")
+	if err := s.store.DeleteSubtask(id); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if !ctx.IsHTMX {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+
+	if err := s.presentation.RenderSubtaskDeleteOOB(w, id); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }

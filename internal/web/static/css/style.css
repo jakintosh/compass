@@ -168,6 +168,33 @@ body {
     /* SVG width + padding */
 }
 
+/* Slideover footer for actions */
+.slideover-footer {
+    margin-top: auto;
+    padding-top: var(--space-xl);
+}
+
+/* Danger button (standalone, not combined with .btn) */
+.btn-danger {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-sm) var(--space-md);
+    background: transparent;
+    color: #dc2626;
+    border: 1px solid #dc2626;
+    border-radius: 4px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: var(--font-size-sm);
+    transition: background-color var(--transition-fast), color var(--transition-fast);
+}
+
+.btn-danger:hover {
+    background-color: #dc2626;
+    color: white;
+}
+
 /* ==========================================
    Categories
    ========================================== */

@@ -6,9 +6,13 @@
 <span id="subtask-percent-{{.ID}}" class="task-percent" {{if .OOB}} hx-swap-oob="true" {{end}}>{{.Completion}}%</span>
 {{end}}
 
+{{define "subtask_delete"}}
+<li id="subtask-{{.ID}}" hx-swap-oob="delete"></li>
+{{end}}
+
 <li class="subtask" id="subtask-{{.ID}}" data-id="{{.ID}}" {{if .OOB}} hx-swap-oob="true" {{end}}>
     <!-- Drag handle -->
-    <div class="drag-handle" onmousedown="event.stopPropagation()">
+    <div class="drag-handle">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
             stroke-linecap="round" stroke-linejoin="round">
             <circle cx="9" cy="12" r="1" />

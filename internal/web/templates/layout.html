@@ -1,3 +1,11 @@
+{{define "slideover_container"}}
+<div id="slideover-container" {{if .OOB}}hx-swap-oob="innerHTML"{{end}}>
+    {{if .ActiveDetails}}
+    {{.ActiveDetails}}
+    {{end}}
+</div>
+{{end}}
+
 <!DOCTYPE html>
 <html lang="en">
 
@@ -8,18 +16,16 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="/static/css/style.css">
-    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.8/dist/htmx.min.js"
+        integrity="sha384-/TgkGk7p307TH7EXJDuUlgG3Ce1UVolAOFopFekQkkXihi5u/6OCvVKyz1W+idaz"
+        crossorigin="anonymous"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
 </head>
 
 <body>
     {{template "content" .}}
 
-    <div id="slideover-container">
-        {{if .ActiveDetails}}
-        {{.ActiveDetails}}
-        {{end}}
-    </div>
+    {{template "slideover_container" .}}
 
     <script src="/static/js/app.js"></script>
 </body>

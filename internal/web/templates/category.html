@@ -3,10 +3,14 @@
     complete</span>
 {{end}}
 
+{{define "category_delete"}}
+<li id="category-{{.ID}}" hx-swap-oob="delete"></li>
+{{end}}
+
 <li class="category" id="category-{{.ID}}" data-id="{{.ID}}" {{if .OOB}} hx-swap-oob="true" {{end}}>
     <div class="category-header">
         <!-- Drag handle -->
-        <div class="drag-handle" onmousedown="event.stopPropagation()">
+        <div class="drag-handle">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                 stroke-linecap="round" stroke-linejoin="round">
                 <circle cx="9" cy="12" r="1" />
@@ -35,7 +39,7 @@
 
         <!-- Edit button on far right -->
         <button class="btn-edit-icon" hx-get="/categories/{{.ID}}/details" hx-target="#slideover-container"
-            hx-swap="innerHTML" onclick="event.stopPropagation()">
+            hx-swap="innerHTML">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                 stroke-linecap="round" stroke-linejoin="round">
                 <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>

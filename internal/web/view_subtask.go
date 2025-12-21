@@ -8,11 +8,12 @@ import (
 
 // SubtaskView is the view model for Subtask
 type SubtaskView struct {
-	ID          string
-	Name        string
-	Description string
-	Completion  int
-	OOB         bool
+	ID           string
+	Name         string
+	Description  string
+	Completion   int
+	OOB          bool
+	DeleteButton DeleteButtonView
 }
 
 // NewSubtaskView creates a SubtaskView from a domain Subtask
@@ -23,6 +24,11 @@ func NewSubtaskView(s *domain.Subtask, oob bool) SubtaskView {
 		Description: s.Description,
 		Completion:  s.Completion,
 		OOB:         oob,
+		DeleteButton: DeleteButtonView{
+			URL:            "/subtasks/" + s.ID,
+			ConfirmMessage: "Delete this subtask?",
+			ButtonText:     "Delete Subtask",
+		},
 	}
 }
 
@@ -77,4 +83,12 @@ func (p *Presentation) RenderSubtaskCreatedOOB(w io.Writer, subView SubtaskView,
 
 	// 2. Update Parent Task (OOB) to show new progress etc.
 	return p.RenderTaskForUpdate(w, taskView)
+}
+
+// RenderSubtaskDeleteOOB renders OOB updates for subtask deletion
+func (p *Presentation) RenderSubtaskDeleteOOB(w io.Writer, id string) error {
+	if err := p.RenderSlideoverClear(w); err != nil {
+		return err
+	}
+	return p.tmpl.ExecuteTemplate(w, "subtask_delete", DeleteOOBView{ID: id})
 }
