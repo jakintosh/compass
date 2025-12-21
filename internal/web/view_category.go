@@ -54,6 +54,11 @@ func (p *Presentation) RenderCategoryDetails(w io.Writer, view CategoryView) err
 	return p.tmpl.ExecuteTemplate(w, "category_details", view)
 }
 
+// RenderCategoryOOB renders a category as an out-of-band update
+func (p *Presentation) RenderCategoryOOB(w io.Writer, view CategoryView) error {
+	return p.tmpl.ExecuteTemplate(w, "category.html", view)
+}
+
 // RenderCategoryDeleteOOB renders OOB updates for category deletion
 func (p *Presentation) RenderCategoryDeleteOOB(w io.Writer, id string) error {
 	if err := p.RenderSlideoverClear(w); err != nil {

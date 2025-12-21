@@ -213,7 +213,8 @@ func (s *Server) handleToggleExpandTask(w http.ResponseWriter, r *http.Request) 
 func (s *Server) handleCreateTask(w http.ResponseWriter, r *http.Request) {
 	ctx := parseRequestContext(r)
 	catID := r.PathValue("id")
-	task, err := s.store.AddTask(catID, "New Task")
+
+	_, err := s.store.AddTask(catID, "New Task")
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -224,7 +225,15 @@ func (s *Server) handleCreateTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := s.presentation.RenderTask(w, NewTaskView(task, false)); err != nil {
+	// Re-fetch category and render it as OOB
+	cat, err := s.store.GetCategory(catID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	catView := NewCategoryView(cat, true)
+	if err := s.presentation.RenderCategoryOOB(w, catView); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
@@ -263,18 +272,15 @@ func (s *Server) handleUpdateTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Re-fetch category for average completion
+	// Re-fetch category and render it as OOB
 	cat, err := s.store.GetCategory(task.CategoryID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	// Convert to view models
-	taskView := NewTaskView(task, true)
 	catView := NewCategoryView(cat, true)
-
-	if err := s.presentation.RenderTaskUpdateOOB(w, taskView, catView); err != nil {
+	if err := s.presentation.RenderCategoryOOB(w, catView); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
@@ -350,7 +356,8 @@ func (s *Server) handleGetTaskDetails(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleCreateSubtask(w http.ResponseWriter, r *http.Request) {
 	ctx := parseRequestContext(r)
 	taskID := r.PathValue("id")
-	sub, err := s.store.AddSubtask(taskID, "New Subtask")
+
+	_, err := s.store.AddSubtask(taskID, "New Subtask")
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -361,18 +368,21 @@ func (s *Server) handleCreateSubtask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Fetch parent task to update progress bar and show subtask inline
+	// Fetch parent task, then category, and render category as OOB
 	task, err := s.store.GetTask(taskID)
 	if err != nil {
 		http.Error(w, "Failed to get parent task", http.StatusInternalServerError)
 		return
 	}
 
-	// Convert to view models
-	subView := NewSubtaskView(sub, false)
-	taskView := NewTaskView(task, true)
+	cat, err := s.store.GetCategory(task.CategoryID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 
-	if err := s.presentation.RenderSubtaskCreatedOOB(w, subView, taskView); err != nil {
+	catView := NewCategoryView(cat, true)
+	if err := s.presentation.RenderCategoryOOB(w, catView); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
@@ -411,40 +421,22 @@ func (s *Server) handleUpdateSubtask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Fetch necessary data for updates
-	taskID := sub.TaskID
-	if taskID == "" {
-		s_check, _ := s.store.GetSubtask(sub.ID)
-		if s_check != nil {
-			taskID = s_check.TaskID
-		}
+	// Fetch parent task, then category, and render category as OOB
+	task, err := s.store.GetTask(sub.TaskID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
-	var task *domain.Task
-	var cat *domain.Category
-
-	if taskID != "" {
-		t, _ := s.store.GetTask(taskID)
-		if t != nil {
-			task = t
-			c, _ := s.store.GetCategory(t.CategoryID)
-			cat = c
-		}
+	cat, err := s.store.GetCategory(task.CategoryID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
-	// Render updates
-	if task != nil {
-		subView := NewSubtaskView(sub, true)
-		taskView := NewTaskView(task, true)
-		var catView *CategoryView
-		if cat != nil {
-			cv := NewCategoryView(cat, true)
-			catView = &cv
-		}
-
-		if err := s.presentation.RenderSubtaskUpdateOOB(w, subView, taskView, catView); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
+	catView := NewCategoryView(cat, true)
+	if err := s.presentation.RenderCategoryOOB(w, catView); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
 
@@ -544,6 +536,15 @@ func (s *Server) handleDeleteCategory(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleDeleteTask(w http.ResponseWriter, r *http.Request) {
 	ctx := parseRequestContext(r)
 	id := r.PathValue("id")
+
+	// Get task first to find parent category
+	task, err := s.store.GetTask(id)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+	catID := task.CategoryID
+
 	if err := s.store.DeleteTask(id); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -554,7 +555,16 @@ func (s *Server) handleDeleteTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := s.presentation.RenderTaskDeleteOOB(w, id); err != nil {
+	// Re-fetch category after deletion and render it as OOB
+	cat, err := s.store.GetCategory(catID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	s.presentation.RenderSlideoverClear(w)
+	catView := NewCategoryView(cat, true)
+	if err := s.presentation.RenderCategoryOOB(w, catView); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
@@ -562,6 +572,21 @@ func (s *Server) handleDeleteTask(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleDeleteSubtask(w http.ResponseWriter, r *http.Request) {
 	ctx := parseRequestContext(r)
 	id := r.PathValue("id")
+
+	// Get subtask, then task to find parent category
+	sub, err := s.store.GetSubtask(id)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+
+	task, err := s.store.GetTask(sub.TaskID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	catID := task.CategoryID
+
 	if err := s.store.DeleteSubtask(id); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -572,7 +597,16 @@ func (s *Server) handleDeleteSubtask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := s.presentation.RenderSubtaskDeleteOOB(w, id); err != nil {
+	// Re-fetch category after deletion and render it as OOB
+	cat, err := s.store.GetCategory(catID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	s.presentation.RenderSlideoverClear(w)
+	catView := NewCategoryView(cat, true)
+	if err := s.presentation.RenderCategoryOOB(w, catView); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }

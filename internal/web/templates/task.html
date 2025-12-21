@@ -11,10 +11,6 @@
     hx-swap-oob="true" {{end}}></div>
 {{end}}
 
-{{define "task_delete"}}
-<li id="task-{{.ID}}" hx-swap-oob="delete"></li>
-{{end}}
-
 <li class="task-item" id="task-{{.ID}}" data-id="{{.ID}}" {{if .OOB}} hx-swap-oob="true" {{end}}>
     <div class="task">
         <!-- Drag handle -->

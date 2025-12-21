@@ -6,10 +6,6 @@
 <span id="subtask-percent-{{.ID}}" class="task-percent" {{if .OOB}} hx-swap-oob="true" {{end}}>{{.Completion}}%</span>
 {{end}}
 
-{{define "subtask_delete"}}
-<li id="subtask-{{.ID}}" hx-swap-oob="delete"></li>
-{{end}}
-
 <li class="subtask" id="subtask-{{.ID}}" data-id="{{.ID}}" {{if .OOB}} hx-swap-oob="true" {{end}}>
     <!-- Drag handle -->
     <div class="drag-handle">
