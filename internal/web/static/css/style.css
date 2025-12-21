@@ -262,7 +262,7 @@ body {
 .task {
     display: flex;
     gap: var(--space-sm);
-    padding: var(--space-sm) 0;
+    padding: var(--space-sm);
     border-bottom: 1px solid var(--color-border-light);
     transition: background-color var(--transition-fast);
 }
@@ -638,7 +638,8 @@ body {
     display: flex;
     align-items: center;
     gap: var(--space-sm);
-    padding: var(--space-sm) 0;
+    padding: var(--space-xs);
+    padding-right: var(--space-sm);
     border-bottom: 1px solid var(--color-border-light);
 }
 
@@ -710,19 +711,17 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 28px;
-    height: 28px;
     border-radius: 50%;
     border: 1px solid var(--color-border);
     background: transparent;
     color: var(--color-text-muted);
     opacity: 0;
-    transition: opacity var(--transition-fast),
-        background-color var(--transition-fast),
-        border-color var(--transition-fast),
-        color var(--transition-fast);
+    transition: var(--transition-fast);
     cursor: pointer;
+    margin: auto;
     flex-shrink: 0;
+    flex-basis: 32px;
+    aspect-ratio: 1;
 }
 
 /* Show on hover of parent row */
