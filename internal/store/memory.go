@@ -178,55 +178,6 @@ func (s *InMemoryStore) DeleteTask(id string) (*domain.Task, error) {
 	return nil, errors.New("task not found")
 }
 
-func (s *InMemoryStore) MoveTask(taskID string, newCatID string, newIndex int) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	var taskToMove *domain.Task
-
-	// 1. Remove from old location
-	for _, c := range s.categories {
-		for i, t := range c.Tasks {
-			if t.ID == taskID {
-				taskToMove = t
-				// Remove
-				c.Tasks = append(c.Tasks[:i], c.Tasks[i+1:]...)
-				break
-			}
-		}
-		if taskToMove != nil {
-			break
-		}
-	}
-
-	if taskToMove == nil {
-		return errors.New("task not found")
-	}
-
-	// 2. Add to new location
-	taskToMove.CategoryID = newCatID
-	for _, sub := range taskToMove.Subtasks {
-		sub.CategoryID = newCatID
-	}
-
-	for _, c := range s.categories {
-		if c.ID == newCatID {
-			// Insert at newIndex
-			if newIndex < 0 {
-				newIndex = 0
-			}
-			if newIndex > len(c.Tasks) {
-				newIndex = len(c.Tasks)
-			}
-
-			c.Tasks = append(c.Tasks[:newIndex], append([]*domain.Task{taskToMove}, c.Tasks[newIndex:]...)...)
-			return nil
-		}
-	}
-
-	return errors.New("target category not found")
-}
-
 func (s *InMemoryStore) ReorderTasks(catID string, taskIDs []string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()

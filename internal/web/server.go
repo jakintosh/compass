@@ -52,7 +52,7 @@ func (s *Server) routes() {
 	s.router.HandleFunc("POST /tasks/{id}/subtasks", s.handleCreateSubtask)
 	s.router.HandleFunc("PATCH /subtasks/{id}", s.handleUpdateSubtask)
 	s.router.HandleFunc("POST /categories/reorder", s.handleReorderCategories)
-	s.router.HandleFunc("POST /tasks/move", s.handleMoveTask)
+	s.router.HandleFunc("POST /tasks/reorder", s.handleReorderTasks)
 	s.router.HandleFunc("GET /subtasks/{id}/details", s.handleGetSubtaskDetails)
 	s.router.HandleFunc("POST /subtasks/reorder", s.handleReorderSubtasks)
 	s.router.HandleFunc("DELETE /categories/{id}", s.handleDeleteCategory)
@@ -474,24 +474,20 @@ func (s *Server) handleReorderCategories(w http.ResponseWriter, r *http.Request)
 	w.WriteHeader(http.StatusOK)
 }
 
-func (s *Server) handleMoveTask(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleReorderTasks(w http.ResponseWriter, r *http.Request) {
 	ctx := parseRequestContext(r)
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	taskID := r.FormValue("task_id")
 	catID := r.FormValue("category_id")
-	idxStr := r.FormValue("index")
-
-	idx, err := strconv.Atoi(idxStr)
-	if err != nil {
-		http.Error(w, "Invalid index", http.StatusBadRequest)
-		return
+	ids := r.Form["id"]
+	if catID == "" || len(ids) == 0 {
+		return // Nothing to do
 	}
 
-	if err := s.store.MoveTask(taskID, catID, idx); err != nil {
+	if err := s.store.ReorderTasks(catID, ids); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

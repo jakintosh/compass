@@ -12,7 +12,6 @@ type Store interface {
 	AddTask(catID string, name string) (*Task, error)
 	UpdateTask(task *Task) (*Task, error)
 	DeleteTask(id string) (*Task, error)
-	MoveTask(taskID string, newCatID string, newIndex int) error
 	ReorderTasks(catID string, taskIDs []string) error
 
 	GetSubtask(id string) (*Subtask, error)

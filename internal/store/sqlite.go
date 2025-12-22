@@ -519,55 +519,6 @@ func (s *SQLiteStore) DeleteTask(id string) (*domain.Task, error) {
 	return &removed, nil
 }
 
-func (s *SQLiteStore) MoveTask(taskID string, newCatID string, newIndex int) error {
-	tx, err := s.db.Begin()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-
-	// 1. Get current category to reorder old siblings? No strictly necessary if we rely on simple incrementing or relative order.
-	// But gaps are fine.
-
-	// 2. Update the task
-	// Need to make space in the new category.
-	// Shift everything >= newIndex up by 1.
-	if _, err := tx.Exec(`
-		UPDATE tasks
-		SET sort_order = sort_order + 1
-		WHERE category_id = ?
-			AND sort_order >= ?`,
-		newCatID,
-		newIndex,
-	); err != nil {
-		return err
-	}
-
-	if _, err := tx.Exec(`
-		UPDATE tasks
-		SET category_id = ?,
-			sort_order = ?
-		WHERE id = ?`,
-		newCatID,
-		newIndex,
-		taskID,
-	); err != nil {
-		return err
-	}
-
-	if _, err := tx.Exec(`
-		UPDATE subtasks
-		SET category_id = ?
-		WHERE task_id = ?`,
-		newCatID,
-		taskID,
-	); err != nil {
-		return err
-	}
-
-	return tx.Commit()
-}
-
 func (s *SQLiteStore) ReorderTasks(catID string, taskIDs []string) error {
 	tx, err := s.db.Begin()
 	if err != nil {
