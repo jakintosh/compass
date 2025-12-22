@@ -14,7 +14,6 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to initialize store: %v", err)
 	}
-	s.Seed() // Add dummy data if empty
 
 	// Initialize Web Server
 	srv, err := web.NewServer(s)
