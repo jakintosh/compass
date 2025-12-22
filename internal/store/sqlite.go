@@ -2,8 +2,8 @@ package store
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
-	"log"
 
 	"git.sr.ht/~jakintosh/todo/internal/domain"
 	"github.com/google/uuid"
@@ -57,17 +57,21 @@ func (s *SQLiteStore) migrate() error {
 	CREATE TABLE IF NOT EXISTS subtasks (
 		id TEXT PRIMARY KEY,
 		task_id TEXT NOT NULL,
+		category_id TEXT NOT NULL,
 		name TEXT NOT NULL,
 		description TEXT DEFAULT '',
 		completion INTEGER DEFAULT 0,
 		sort_order INTEGER DEFAULT 0,
-		FOREIGN KEY(task_id) REFERENCES tasks(id) ON DELETE CASCADE
+		FOREIGN KEY(task_id) REFERENCES tasks(id) ON DELETE CASCADE,
+		FOREIGN KEY(category_id) REFERENCES categories(id) ON DELETE CASCADE
 	);
 	`
 	// Simple migrations for existing DBs
 	s.db.Exec(`ALTER TABLE categories ADD COLUMN description TEXT DEFAULT ''`)
 	s.db.Exec(`ALTER TABLE tasks ADD COLUMN expanded BOOLEAN DEFAULT 0`)
 	s.db.Exec(`ALTER TABLE subtasks ADD COLUMN description TEXT DEFAULT ''`)
+	s.db.Exec(`ALTER TABLE subtasks ADD COLUMN category_id TEXT DEFAULT ''`)
+	s.db.Exec(`UPDATE subtasks SET category_id = (SELECT category_id FROM tasks WHERE tasks.id = subtasks.task_id) WHERE category_id IS NULL OR category_id = ''`)
 	_, err := s.db.Exec(query)
 	return err
 }
@@ -82,7 +86,12 @@ func (s *SQLiteStore) GetCategories() ([]*domain.Category, error) {
 	var categories []*domain.Category
 	for rows.Next() {
 		var c domain.Category
-		if err := rows.Scan(&c.ID, &c.Name, &c.Description, &c.Collapsed); err != nil {
+		if err := rows.Scan(
+			&c.ID,
+			&c.Name,
+			&c.Description,
+			&c.Collapsed,
+		); err != nil {
 			return nil, err
 		}
 		c.Tasks = []*domain.Task{} // Initialize slice
@@ -105,7 +114,14 @@ func (s *SQLiteStore) GetCategories() ([]*domain.Category, error) {
 
 	for taskRows.Next() {
 		var t domain.Task
-		if err := taskRows.Scan(&t.ID, &t.CategoryID, &t.Name, &t.Description, &t.Completion, &t.Expanded); err != nil {
+		if err := taskRows.Scan(
+			&t.ID,
+			&t.CategoryID,
+			&t.Name,
+			&t.Description,
+			&t.Completion,
+			&t.Expanded,
+		); err != nil {
 			return nil, err
 		}
 		t.Subtasks = []*domain.Subtask{}
@@ -114,7 +130,7 @@ func (s *SQLiteStore) GetCategories() ([]*domain.Category, error) {
 	}
 
 	// Fetch all subtasks
-	subRows, err := s.db.Query(`SELECT id, task_id, name, description, completion FROM subtasks ORDER BY sort_order ASC`)
+	subRows, err := s.db.Query(`SELECT id, task_id, category_id, name, description, completion FROM subtasks ORDER BY sort_order ASC`)
 	if err != nil {
 		return nil, err
 	}
@@ -123,7 +139,14 @@ func (s *SQLiteStore) GetCategories() ([]*domain.Category, error) {
 	subsByTask := make(map[string][]*domain.Subtask)
 	for subRows.Next() {
 		var sub domain.Subtask
-		if err := subRows.Scan(&sub.ID, &sub.TaskID, &sub.Name, &sub.Description, &sub.Completion); err != nil {
+		if err := subRows.Scan(
+			&sub.ID,
+			&sub.TaskID,
+			&sub.CategoryID,
+			&sub.Name,
+			&sub.Description,
+			&sub.Completion,
+		); err != nil {
 			return nil, err
 		}
 		subsByTask[sub.TaskID] = append(subsByTask[sub.TaskID], &sub)
@@ -152,22 +175,11 @@ func (s *SQLiteStore) GetCategory(id string) (*domain.Category, error) {
 		return nil, err
 	}
 
-	// We need to fill tasks too if we want full object, but does the app rely on it?
-	// The interface implies we return the Category struct which has Tasks field.
-	// In the memory store we return the object which has the tasks.
-	// So yes, we should probably fetch tasks.
-	// However, usually GetCategory might just be for metadata.
-	// Let's check usage. `handleToggleCollapseCategory` just flips a bool and saves.
-	// `handleCreateCategory` returns a new category.
-	// To be safe, let's load tasks.
-
-	// Actually for `GetCategory` in `handleToggleCollapseCategory`, we only need the struct fields.
-	// But let's act like a proper object store.
-
 	tasks, err := s.getTasksForCategory(c.ID)
 	if err != nil {
 		return nil, err
 	}
+
 	c.Tasks = tasks
 	return &c, nil
 }
@@ -182,7 +194,14 @@ func (s *SQLiteStore) getTasksForCategory(catID string) ([]*domain.Task, error) 
 	var tasks []*domain.Task
 	for rows.Next() {
 		var t domain.Task
-		if err := rows.Scan(&t.ID, &t.CategoryID, &t.Name, &t.Description, &t.Completion, &t.Expanded); err != nil {
+		if err := rows.Scan(
+			&t.ID,
+			&t.CategoryID,
+			&t.Name,
+			&t.Description,
+			&t.Completion,
+			&t.Expanded,
+		); err != nil {
 			return nil, err
 		}
 
@@ -198,7 +217,7 @@ func (s *SQLiteStore) getTasksForCategory(catID string) ([]*domain.Task, error) 
 }
 
 func (s *SQLiteStore) getSubtasksForTask(taskID string) ([]*domain.Subtask, error) {
-	rows, err := s.db.Query(`SELECT id, task_id, name, description, completion FROM subtasks WHERE task_id = ? ORDER BY sort_order ASC`, taskID)
+	rows, err := s.db.Query(`SELECT id, task_id, category_id, name, description, completion FROM subtasks WHERE task_id = ? ORDER BY sort_order ASC`, taskID)
 	if err != nil {
 		return nil, err
 	}
@@ -207,7 +226,14 @@ func (s *SQLiteStore) getSubtasksForTask(taskID string) ([]*domain.Subtask, erro
 	var subs []*domain.Subtask
 	for rows.Next() {
 		var sub domain.Subtask
-		if err := rows.Scan(&sub.ID, &sub.TaskID, &sub.Name, &sub.Description, &sub.Completion); err != nil {
+		if err := rows.Scan(
+			&sub.ID,
+			&sub.TaskID,
+			&sub.CategoryID,
+			&sub.Name,
+			&sub.Description,
+			&sub.Completion,
+		); err != nil {
 			return nil, err
 		}
 		subs = append(subs, &sub)
@@ -234,22 +260,71 @@ func (s *SQLiteStore) AddCategory(name string) (*domain.Category, error) {
 	}, nil
 }
 
-func (s *SQLiteStore) UpdateCategory(cat *domain.Category) error {
-	_, err := s.db.Exec(`UPDATE categories SET name = ?, description = ?, collapsed = ? WHERE id = ?`, cat.Name, cat.Description, cat.Collapsed, cat.ID)
-	return err
+func (s *SQLiteStore) UpdateCategory(cat *domain.Category) (*domain.Category, error) {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	var updated domain.Category
+	if err := tx.QueryRow(
+		`UPDATE categories
+			SET name = ?,
+				description = ?,
+				collapsed = ?
+			WHERE id = ?
+		RETURNING
+			id,
+			name,
+			description,
+			collapsed`,
+		cat.Name,
+		cat.Description,
+		cat.Collapsed,
+		cat.ID,
+	).Scan(
+		&updated.ID,
+		&updated.Name,
+		&updated.Description,
+		&updated.Collapsed,
+	); err != nil {
+		return nil, err
+	}
+	updated.Tasks = cat.Tasks
+
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return &updated, nil
 }
 
-func (s *SQLiteStore) DeleteCategory(id string) error {
+func (s *SQLiteStore) DeleteCategory(id string) (*domain.Category, error) {
 	// Cascade should handle tasks/subtasks
-	result, err := s.db.Exec(`DELETE FROM categories WHERE id = ?`, id)
+	tx, err := s.db.Begin()
 	if err != nil {
-		return err
+		return nil, err
 	}
-	rows, _ := result.RowsAffected()
-	if rows == 0 {
-		return fmt.Errorf("category not found")
+	defer tx.Rollback()
+
+	var removed domain.Category
+	if err := tx.QueryRow(
+		`DELETE FROM categories WHERE id = ?
+		RETURNING id, name, description, collapsed`,
+		id,
+	).Scan(
+		&removed.ID,
+		&removed.Name,
+		&removed.Description,
+		&removed.Collapsed,
+	); err != nil {
+		return nil, err
 	}
-	return nil
+
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return &removed, nil
 }
 
 func (s *SQLiteStore) ReorderCategories(ids []string) error {
@@ -269,7 +344,14 @@ func (s *SQLiteStore) ReorderCategories(ids []string) error {
 
 func (s *SQLiteStore) GetTask(id string) (*domain.Task, error) {
 	var t domain.Task
-	err := s.db.QueryRow(`SELECT id, category_id, name, description, completion, expanded FROM tasks WHERE id = ?`, id).Scan(&t.ID, &t.CategoryID, &t.Name, &t.Description, &t.Completion, &t.Expanded)
+	err := s.db.QueryRow(`SELECT id, category_id, name, description, completion, expanded FROM tasks WHERE id = ?`, id).Scan(
+		&t.ID,
+		&t.CategoryID,
+		&t.Name,
+		&t.Description,
+		&t.Completion,
+		&t.Expanded,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -299,21 +381,77 @@ func (s *SQLiteStore) AddTask(catID string, name string) (*domain.Task, error) {
 	}, nil
 }
 
-func (s *SQLiteStore) UpdateTask(task *domain.Task) error {
-	_, err := s.db.Exec(`UPDATE tasks SET name = ?, description = ?, completion = ?, expanded = ? WHERE id = ?`, task.Name, task.Description, task.Completion, task.Expanded, task.ID)
-	return err
+func (s *SQLiteStore) UpdateTask(task *domain.Task) (*domain.Task, error) {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	var updated domain.Task
+	if err := tx.QueryRow(
+		`UPDATE tasks SET name = ?, description = ?, completion = ?, expanded = ? WHERE id = ?
+		RETURNING id, category_id, name, description, completion, expanded`,
+		task.Name,
+		task.Description,
+		task.Completion,
+		task.Expanded,
+		task.ID,
+	).Scan(
+		&updated.ID,
+		&updated.CategoryID,
+		&updated.Name,
+		&updated.Description,
+		&updated.Completion,
+		&updated.Expanded,
+	); err != nil {
+		return nil, err
+	}
+	updated.Subtasks = task.Subtasks
+
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return &updated, nil
 }
 
-func (s *SQLiteStore) DeleteTask(id string) error {
-	result, err := s.db.Exec(`DELETE FROM tasks WHERE id = ?`, id)
+func (s *SQLiteStore) DeleteTask(id string) (*domain.Task, error) {
+	tx, err := s.db.Begin()
 	if err != nil {
-		return err
+		return nil, err
 	}
-	rows, _ := result.RowsAffected()
-	if rows == 0 {
-		return fmt.Errorf("task not found")
+	defer tx.Rollback()
+
+	var removed domain.Task
+	if err := tx.QueryRow(
+		`DELETE FROM tasks
+		WHERE id = ?
+		RETURNING
+			id,
+			category_id,
+			name,
+			description,
+			completion,
+			expanded`,
+		id,
+	).Scan(
+		&removed.ID,
+		&removed.CategoryID,
+		&removed.Name,
+		&removed.Description,
+		&removed.Completion,
+		&removed.Expanded,
+	); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, fmt.Errorf("task not found")
+		}
+		return nil, err
 	}
-	return nil
+
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return &removed, nil
 }
 
 func (s *SQLiteStore) MoveTask(taskID string, newCatID string, newIndex int) error {
@@ -334,6 +472,10 @@ func (s *SQLiteStore) MoveTask(taskID string, newCatID string, newIndex int) err
 	}
 
 	if _, err := tx.Exec(`UPDATE tasks SET category_id = ?, sort_order = ? WHERE id = ?`, newCatID, newIndex, taskID); err != nil {
+		return err
+	}
+
+	if _, err := tx.Exec(`UPDATE subtasks SET category_id = ? WHERE task_id = ?`, newCatID, taskID); err != nil {
 		return err
 	}
 
@@ -359,7 +501,25 @@ func (s *SQLiteStore) ReorderTasks(catID string, taskIDs []string) error {
 
 func (s *SQLiteStore) GetSubtask(id string) (*domain.Subtask, error) {
 	var sub domain.Subtask
-	err := s.db.QueryRow(`SELECT id, task_id, name, description, completion FROM subtasks WHERE id = ?`, id).Scan(&sub.ID, &sub.TaskID, &sub.Name, &sub.Description, &sub.Completion)
+	err := s.db.QueryRow(
+		`SELECT
+			id,
+			task_id,
+			category_id,
+			name,
+			description,
+			completion
+		FROM subtasks
+		WHERE id = ?`,
+		id,
+	).Scan(
+		&sub.ID,
+		&sub.TaskID,
+		&sub.CategoryID,
+		&sub.Name,
+		&sub.Description,
+		&sub.Completion,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -369,77 +529,115 @@ func (s *SQLiteStore) GetSubtask(id string) (*domain.Subtask, error) {
 func (s *SQLiteStore) AddSubtask(taskID string, name string) (*domain.Subtask, error) {
 	id := uuid.NewString()
 
+	tx, err := s.db.Begin()
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
 	var maxOrder sql.NullInt64
-	s.db.QueryRow("SELECT MAX(sort_order) FROM subtasks WHERE task_id = ?", taskID).Scan(&maxOrder)
+	if err := tx.QueryRow("SELECT MAX(sort_order) FROM subtasks WHERE task_id = ?", taskID).Scan(&maxOrder); err != nil {
+		return nil, err
+	}
 	order := int(maxOrder.Int64) + 1
 
-	if _, err := s.db.Exec(`INSERT INTO subtasks (id, task_id, name, sort_order) VALUES (?, ?, ?, ?)`, id, taskID, name, order); err != nil {
+	var sub domain.Subtask
+	if err := tx.QueryRow(
+		`INSERT INTO subtasks (id, task_id, category_id, name, sort_order)
+		SELECT ?, ?, category_id, ?, ? FROM tasks WHERE id = ?
+		RETURNING id, task_id, category_id, name, description, completion`,
+		id, taskID, name, order, taskID,
+	).Scan(
+		&sub.ID,
+		&sub.TaskID,
+		&sub.CategoryID,
+		&sub.Name,
+		&sub.Description,
+		&sub.Completion,
+	); err != nil {
 		return nil, err
 	}
 
-	// Update parent task completion logic is currently in memory store...
-	// The memory store does: `t.UpdateCompletion()`.
-	// The domain model has the logic.
-	// But wait, the domain model needs the subtasks to calculate completion.
-	// In the memory store we held the objects. Here we don't.
-	// So we need to fetch all subtasks for the task, calculate completion, and save the task.
-
-	if err := s.updateTaskCompletionInternal(taskID); err != nil {
-		// Log error but don't fail the add? Or fail?
-		log.Printf("Failed to update task completion: %v", err)
+	if err := updateTaskCompletionTx(tx, sub.TaskID); err != nil {
+		return nil, err
 	}
 
-	return &domain.Subtask{
-		ID:     id,
-		TaskID: taskID,
-		Name:   name,
-	}, nil
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+
+	return &sub, nil
 }
 
-func (s *SQLiteStore) UpdateSubtask(sub *domain.Subtask) error {
-	_, err := s.db.Exec(`UPDATE subtasks SET name = ?, description = ?, completion = ? WHERE id = ?`, sub.Name, sub.Description, sub.Completion, sub.ID)
+func (s *SQLiteStore) UpdateSubtask(sub *domain.Subtask) (*domain.Subtask, error) {
+	tx, err := s.db.Begin()
 	if err != nil {
-		return err
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	var updated domain.Subtask
+	if err := tx.QueryRow(
+		`UPDATE subtasks SET name = ?, description = ?, completion = ? WHERE id = ?
+		RETURNING id, task_id, category_id, name, description, completion`,
+		sub.Name, sub.Description, sub.Completion, sub.ID,
+	).Scan(&updated.ID, &updated.TaskID, &updated.CategoryID, &updated.Name, &updated.Description, &updated.Completion); err != nil {
+		return nil, err
 	}
 
-	// Need to fetch the subtask to get task_id IF it wasn't populated in the input struct.
-	// But typically `UpdateSubtask` receives a struct that might be incomplete if constructed from form?
-	// The form handler does `s.store.GetSubtask(id)` first, then updates fields.
-	// So `sub` has `TaskID`.
-
-	// But wait, `GetSubtask` in `server.go` calls our `GetSubtask`, which sets `TaskID`.
-	// So `sub.TaskID` should be set.
-
-	if sub.TaskID != "" {
-		return s.updateTaskCompletionInternal(sub.TaskID)
-	}
-	// If missing, we have to look it up.
-	var taskID string
-	if err := s.db.QueryRow("SELECT task_id FROM subtasks WHERE id = ?", sub.ID).Scan(&taskID); err == nil {
-		return s.updateTaskCompletionInternal(taskID)
+	if err := updateTaskCompletionTx(tx, updated.TaskID); err != nil {
+		return nil, err
 	}
 
-	return nil
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+
+	return &updated, nil
 }
 
-func (s *SQLiteStore) DeleteSubtask(id string) error {
-	var taskID string
-	s.db.QueryRow("SELECT task_id FROM subtasks WHERE id = ?", id).Scan(&taskID)
-
-	result, err := s.db.Exec(`DELETE FROM subtasks WHERE id = ?`, id)
+func (s *SQLiteStore) DeleteSubtask(id string) (*domain.Subtask, error) {
+	tx, err := s.db.Begin()
 	if err != nil {
-		return err
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	var removed domain.Subtask
+	if err := tx.QueryRow(`
+		DELETE FROM subtasks
+		WHERE id = ?
+		RETURNING
+			id,
+			task_id,
+			category_id,
+			name,
+			description,
+			completion`,
+		id,
+	).Scan(
+		&removed.ID,
+		&removed.TaskID,
+		&removed.CategoryID,
+		&removed.Name,
+		&removed.Description,
+		&removed.Completion,
+	); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, fmt.Errorf("subtask not found")
+		}
+		return nil, err
 	}
 
-	if taskID != "" {
-		s.updateTaskCompletionInternal(taskID)
+	if err := updateTaskCompletionTx(tx, removed.TaskID); err != nil {
+		return nil, err
 	}
 
-	rows, _ := result.RowsAffected()
-	if rows == 0 {
-		return fmt.Errorf("subtask not found")
+	if err := tx.Commit(); err != nil {
+		return nil, err
 	}
-	return nil
+
+	return &removed, nil
 }
 
 func (s *SQLiteStore) ReorderSubtasks(taskID string, subIDs []string) error {
@@ -457,17 +655,17 @@ func (s *SQLiteStore) ReorderSubtasks(taskID string, subIDs []string) error {
 	return tx.Commit()
 }
 
-func (s *SQLiteStore) updateTaskCompletionInternal(taskID string) error {
-	subs, err := s.getSubtasksForTask(taskID)
-	if err != nil {
-		return err
-	}
+type taskCompletionExecutor interface {
+	Exec(query string, args ...any) (sql.Result, error)
+}
 
-	// Create a dummy task to use the domain logic
-	t := &domain.Task{Subtasks: subs}
-	t.UpdateCompletion()
-
-	_, err = s.db.Exec(`UPDATE tasks SET completion = ? WHERE id = ?`, t.Completion, taskID)
+func updateTaskCompletionTx(exec taskCompletionExecutor, taskID string) error {
+	_, err := exec.Exec(
+		`UPDATE tasks
+		SET completion = COALESCE((SELECT CAST(AVG(completion) AS INTEGER) FROM subtasks WHERE task_id = ?), 0)
+		WHERE id = ?`,
+		taskID, taskID,
+	)
 	return err
 }
 

@@ -3,6 +3,7 @@ package web
 import (
 	"net/http"
 	"strconv"
+	"strings"
 
 	"git.sr.ht/~jakintosh/todo/internal/domain"
 )
@@ -106,7 +107,11 @@ func (s *Server) handleToggleCollapseCategory(w http.ResponseWriter, r *http.Req
 
 	// Handle Toggle Collapse
 	cat.Collapsed = !cat.Collapsed
-	s.store.UpdateCategory(cat)
+	cat, err = s.store.UpdateCategory(cat)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 
 	if !ctx.IsHTMX {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
@@ -139,7 +144,11 @@ func (s *Server) handleUpdateCategory(w http.ResponseWriter, r *http.Request) {
 		cat.Description = desc
 	}
 
-	s.store.UpdateCategory(cat)
+	cat, err = s.store.UpdateCategory(cat)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 
 	if !ctx.IsHTMX {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
@@ -198,7 +207,11 @@ func (s *Server) handleToggleExpandTask(w http.ResponseWriter, r *http.Request) 
 
 	// Toggle expanded state
 	task.Expanded = !task.Expanded
-	s.store.UpdateTask(task)
+	task, err = s.store.UpdateTask(task)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 
 	if !ctx.IsHTMX {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
@@ -241,6 +254,7 @@ func (s *Server) handleCreateTask(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleUpdateTask(w http.ResponseWriter, r *http.Request) {
 	ctx := parseRequestContext(r)
 	id := r.PathValue("id")
+
 	task, err := s.store.GetTask(id)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
@@ -265,7 +279,11 @@ func (s *Server) handleUpdateTask(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	s.store.UpdateTask(task)
+	task, err = s.store.UpdateTask(task)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 
 	if !ctx.IsHTMX {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
@@ -357,7 +375,7 @@ func (s *Server) handleCreateSubtask(w http.ResponseWriter, r *http.Request) {
 	ctx := parseRequestContext(r)
 	taskID := r.PathValue("id")
 
-	_, err := s.store.AddSubtask(taskID, "New Subtask")
+	sub, err := s.store.AddSubtask(taskID, "New Subtask")
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -368,14 +386,8 @@ func (s *Server) handleCreateSubtask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Fetch parent task, then category, and render category as OOB
-	task, err := s.store.GetTask(taskID)
-	if err != nil {
-		http.Error(w, "Failed to get parent task", http.StatusInternalServerError)
-		return
-	}
-
-	cat, err := s.store.GetCategory(task.CategoryID)
+	// Fetch parent category and render it as OOB
+	cat, err := s.store.GetCategory(sub.CategoryID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -414,21 +426,19 @@ func (s *Server) handleUpdateSubtask(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	s.store.UpdateSubtask(sub)
+	sub, err = s.store.UpdateSubtask(sub)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 
 	if !ctx.IsHTMX {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
 	}
 
-	// Fetch parent task, then category, and render category as OOB
-	task, err := s.store.GetTask(sub.TaskID)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	cat, err := s.store.GetCategory(task.CategoryID)
+	// Fetch parent category and render it as OOB
+	cat, err := s.store.GetCategory(sub.CategoryID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -518,7 +528,8 @@ func (s *Server) handleReorderSubtasks(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleDeleteCategory(w http.ResponseWriter, r *http.Request) {
 	ctx := parseRequestContext(r)
 	id := r.PathValue("id")
-	if err := s.store.DeleteCategory(id); err != nil {
+
+	if _, err := s.store.DeleteCategory(id); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -537,15 +548,12 @@ func (s *Server) handleDeleteTask(w http.ResponseWriter, r *http.Request) {
 	ctx := parseRequestContext(r)
 	id := r.PathValue("id")
 
-	// Get task first to find parent category
-	task, err := s.store.GetTask(id)
+	task, err := s.store.DeleteTask(id)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusNotFound)
-		return
-	}
-	catID := task.CategoryID
-
-	if err := s.store.DeleteTask(id); err != nil {
+		if strings.Contains(strings.ToLower(err.Error()), "not found") {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -556,7 +564,7 @@ func (s *Server) handleDeleteTask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Re-fetch category after deletion and render it as OOB
-	cat, err := s.store.GetCategory(catID)
+	cat, err := s.store.GetCategory(task.CategoryID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -573,21 +581,12 @@ func (s *Server) handleDeleteSubtask(w http.ResponseWriter, r *http.Request) {
 	ctx := parseRequestContext(r)
 	id := r.PathValue("id")
 
-	// Get subtask, then task to find parent category
-	sub, err := s.store.GetSubtask(id)
+	sub, err := s.store.DeleteSubtask(id)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusNotFound)
-		return
-	}
-
-	task, err := s.store.GetTask(sub.TaskID)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	catID := task.CategoryID
-
-	if err := s.store.DeleteSubtask(id); err != nil {
+		if strings.Contains(strings.ToLower(err.Error()), "not found") {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -598,7 +597,7 @@ func (s *Server) handleDeleteSubtask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Re-fetch category after deletion and render it as OOB
-	cat, err := s.store.GetCategory(catID)
+	cat, err := s.store.GetCategory(sub.CategoryID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

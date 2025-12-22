@@ -52,28 +52,31 @@ func (s *InMemoryStore) AddCategory(name string) (*domain.Category, error) {
 	return cat, nil
 }
 
-func (s *InMemoryStore) UpdateCategory(cat *domain.Category) error {
+func (s *InMemoryStore) UpdateCategory(cat *domain.Category) (*domain.Category, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	for i, c := range s.categories {
+	for _, c := range s.categories {
 		if c.ID == cat.ID {
-			s.categories[i] = cat
-			return nil
+			c.Name = cat.Name
+			c.Description = cat.Description
+			c.Collapsed = cat.Collapsed
+			return c, nil
 		}
 	}
-	return errors.New("category not found")
+	return nil, errors.New("category not found")
 }
 
-func (s *InMemoryStore) DeleteCategory(id string) error {
+func (s *InMemoryStore) DeleteCategory(id string) (*domain.Category, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for i, c := range s.categories {
 		if c.ID == id {
+			removed := c
 			s.categories = append(s.categories[:i], s.categories[i+1:]...)
-			return nil
+			return removed, nil
 		}
 	}
-	return errors.New("category not found")
+	return nil, errors.New("category not found")
 }
 
 func (s *InMemoryStore) ReorderCategories(ids []string) error {
@@ -137,39 +140,42 @@ func (s *InMemoryStore) AddTask(catID string, name string) (*domain.Task, error)
 	return nil, errors.New("category not found")
 }
 
-func (s *InMemoryStore) UpdateTask(task *domain.Task) error {
+func (s *InMemoryStore) UpdateTask(task *domain.Task) (*domain.Task, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	// Since task could be in any category, we find it and replace it.
-	// But wait, the task struct has CategoryID.
-
 	for _, c := range s.categories {
-		if c.ID == task.CategoryID {
-			for i, t := range c.Tasks {
-				if t.ID == task.ID {
-					c.Tasks[i] = task
-					return nil
-				}
+		if c.ID != task.CategoryID {
+			continue
+		}
+		for _, t := range c.Tasks {
+			if t.ID == task.ID {
+				t.Name = task.Name
+				t.Description = task.Description
+				t.Completion = task.Completion
+				t.Expanded = task.Expanded
+				t.CategoryID = c.ID
+				return t, nil
 			}
 		}
 	}
-	return errors.New("task not found in its specified category")
+	return nil, errors.New("task not found")
 }
 
-func (s *InMemoryStore) DeleteTask(id string) error {
+func (s *InMemoryStore) DeleteTask(id string) (*domain.Task, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	for _, c := range s.categories {
 		for i, t := range c.Tasks {
 			if t.ID == id {
+				removed := t
 				c.Tasks = append(c.Tasks[:i], c.Tasks[i+1:]...)
-				return nil
+				return removed, nil
 			}
 		}
 	}
-	return errors.New("task not found")
+	return nil, errors.New("task not found")
 }
 
 func (s *InMemoryStore) MoveTask(taskID string, newCatID string, newIndex int) error {
@@ -199,6 +205,9 @@ func (s *InMemoryStore) MoveTask(taskID string, newCatID string, newIndex int) e
 
 	// 2. Add to new location
 	taskToMove.CategoryID = newCatID
+	for _, sub := range taskToMove.Subtasks {
+		sub.CategoryID = newCatID
+	}
 
 	for _, c := range s.categories {
 		if c.ID == newCatID {
@@ -273,8 +282,10 @@ func (s *InMemoryStore) AddSubtask(taskID string, name string) (*domain.Subtask,
 		for _, t := range c.Tasks {
 			if t.ID == taskID {
 				sub := &domain.Subtask{
-					ID:   uuid.NewString(),
-					Name: name,
+					ID:         uuid.NewString(),
+					TaskID:     t.ID,
+					CategoryID: c.ID,
+					Name:       name,
 				}
 				t.Subtasks = append(t.Subtasks, sub)
 				t.UpdateCompletion() // Recalculate
@@ -285,7 +296,7 @@ func (s *InMemoryStore) AddSubtask(taskID string, name string) (*domain.Subtask,
 	return nil, errors.New("parent task not found")
 }
 
-func (s *InMemoryStore) UpdateSubtask(sub *domain.Subtask) error {
+func (s *InMemoryStore) UpdateSubtask(sub *domain.Subtask) (*domain.Subtask, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -293,17 +304,21 @@ func (s *InMemoryStore) UpdateSubtask(sub *domain.Subtask) error {
 		for _, t := range c.Tasks {
 			for i, sItem := range t.Subtasks {
 				if sItem.ID == sub.ID {
-					t.Subtasks[i] = sub
+					t.Subtasks[i].Name = sub.Name
+					t.Subtasks[i].Description = sub.Description
+					t.Subtasks[i].Completion = sub.Completion
+					t.Subtasks[i].TaskID = t.ID
+					t.Subtasks[i].CategoryID = c.ID
 					t.UpdateCompletion()
-					return nil
+					return t.Subtasks[i], nil
 				}
 			}
 		}
 	}
-	return errors.New("subtask not found")
+	return nil, errors.New("subtask not found")
 }
 
-func (s *InMemoryStore) DeleteSubtask(id string) error {
+func (s *InMemoryStore) DeleteSubtask(id string) (*domain.Subtask, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -311,14 +326,17 @@ func (s *InMemoryStore) DeleteSubtask(id string) error {
 		for _, t := range c.Tasks {
 			for i, sub := range t.Subtasks {
 				if sub.ID == id {
+					sub.TaskID = t.ID
+					sub.CategoryID = c.ID
+					removed := sub
 					t.Subtasks = append(t.Subtasks[:i], t.Subtasks[i+1:]...)
 					t.UpdateCompletion()
-					return nil
+					return removed, nil
 				}
 			}
 		}
 	}
-	return errors.New("subtask not found")
+	return nil, errors.New("subtask not found")
 }
 
 func (s *InMemoryStore) ReorderSubtasks(taskID string, subIDs []string) error {
@@ -365,8 +383,8 @@ func (s *InMemoryStore) Seed() {
 	cat2 := &domain.Category{ID: uuid.NewString(), Name: "Personal", Tasks: []*domain.Task{}}
 	task2 := &domain.Task{ID: uuid.NewString(), CategoryID: cat2.ID, Name: "Buy Groceries", Completion: 0}
 
-	sub1 := &domain.Subtask{ID: uuid.NewString(), Name: "Milk", Completion: 0}
-	sub2 := &domain.Subtask{ID: uuid.NewString(), Name: "Eggs", Completion: 100}
+	sub1 := &domain.Subtask{ID: uuid.NewString(), TaskID: task2.ID, CategoryID: cat2.ID, Name: "Milk", Completion: 0}
+	sub2 := &domain.Subtask{ID: uuid.NewString(), TaskID: task2.ID, CategoryID: cat2.ID, Name: "Eggs", Completion: 100}
 	task2.Subtasks = append(task2.Subtasks, sub1, sub2)
 	task2.UpdateCompletion() // Should be 50
 
