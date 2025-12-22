@@ -556,7 +556,7 @@ svg.task-expand-indicator {
     transform: rotate(-90deg);
 }
 
-svg.task-expand-indicator.expanded {
+.expand-toggle-btn:not(.collapsed) svg.task-expand-indicator {
     transform: rotate(0deg);
 }
 

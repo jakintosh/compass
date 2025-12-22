@@ -44,10 +44,8 @@ func (s *Server) routes() {
 	s.router.HandleFunc("POST /categories", s.handleCreateCategory)
 	s.router.HandleFunc("PATCH /categories/{id}", s.handleUpdateCategory)
 	s.router.HandleFunc("GET /categories/{id}/details", s.handleGetCategoryDetails)
-	s.router.HandleFunc("PATCH /categories/{id}/toggle-collapse", s.handleToggleCollapseCategory)
 	s.router.HandleFunc("POST /categories/{id}/tasks", s.handleCreateTask)
 	s.router.HandleFunc("PATCH /tasks/{id}", s.handleUpdateTask)
-	s.router.HandleFunc("PATCH /tasks/{id}/toggle-expand", s.handleToggleExpandTask)
 	s.router.HandleFunc("GET /tasks/{id}/details", s.handleGetTaskDetails)
 	s.router.HandleFunc("POST /tasks/{id}/subtasks", s.handleCreateSubtask)
 	s.router.HandleFunc("PATCH /subtasks/{id}", s.handleUpdateSubtask)
@@ -81,33 +79,6 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleCreateCategory(w http.ResponseWriter, r *http.Request) {
 	ctx := parseRequestContext(r)
 	cat, err := s.store.AddCategory("New Category")
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	if !ctx.IsHTMX {
-		http.Redirect(w, r, "/", http.StatusSeeOther)
-		return
-	}
-
-	if err := s.presentation.RenderCategory(w, NewCategoryView(cat, false)); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
-}
-
-func (s *Server) handleToggleCollapseCategory(w http.ResponseWriter, r *http.Request) {
-	ctx := parseRequestContext(r)
-	id := r.PathValue("id")
-	cat, err := s.store.GetCategory(id)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusNotFound)
-		return
-	}
-
-	// Handle Toggle Collapse
-	cat.Collapsed = !cat.Collapsed
-	cat, err = s.store.UpdateCategory(cat)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -192,33 +163,6 @@ func (s *Server) handleGetCategoryDetails(w http.ResponseWriter, r *http.Request
 	}
 
 	if err := s.presentation.RenderIndexWithDetails(w, catViews, NewCategoryView(cat, false)); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
-}
-
-func (s *Server) handleToggleExpandTask(w http.ResponseWriter, r *http.Request) {
-	ctx := parseRequestContext(r)
-	id := r.PathValue("id")
-	task, err := s.store.GetTask(id)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusNotFound)
-		return
-	}
-
-	// Toggle expanded state
-	task.Expanded = !task.Expanded
-	task, err = s.store.UpdateTask(task)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	if !ctx.IsHTMX {
-		http.Redirect(w, r, "/", http.StatusSeeOther)
-		return
-	}
-
-	if err := s.presentation.RenderTask(w, NewTaskView(task, false)); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }

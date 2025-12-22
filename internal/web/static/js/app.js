@@ -1,4 +1,11 @@
 document.addEventListener("htmx:load", function (evt) {
+  if (window.Alpine) {
+    const target = evt.detail && evt.detail.elt ? evt.detail.elt : evt.target;
+    if (target) {
+      Alpine.initTree(target);
+    }
+  }
+
   // Initialize Sortable for Categories
   let categoriesList = document.getElementById("categories-list");
   if (categoriesList && !categoriesList.sortableInitialized) {

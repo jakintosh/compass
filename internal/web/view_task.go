@@ -12,7 +12,6 @@ type TaskView struct {
 	Name         string
 	Description  string
 	Completion   int
-	Expanded     bool
 	HasSubtasks  bool
 	Subtasks     []SubtaskView
 	OOB          bool
@@ -26,7 +25,6 @@ func NewTaskView(t *domain.Task, oob bool) TaskView {
 		Name:        t.Name,
 		Description: t.Description,
 		Completion:  t.Completion,
-		Expanded:    t.Expanded,
 		OOB:         oob,
 	}
 	if len(t.Subtasks) > 0 {

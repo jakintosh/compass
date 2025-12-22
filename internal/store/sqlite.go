@@ -39,7 +39,6 @@ func (s *SQLiteStore) migrate() error {
 			id TEXT PRIMARY KEY,
 			name TEXT NOT NULL,
 			description TEXT DEFAULT '',
-			collapsed BOOLEAN DEFAULT 0,
 			sort_order INTEGER DEFAULT 0
 		);
 
@@ -49,7 +48,6 @@ func (s *SQLiteStore) migrate() error {
 			name TEXT NOT NULL,
 			description TEXT DEFAULT '',
 			completion INTEGER DEFAULT 0,
-			expanded BOOLEAN DEFAULT 0,
 			sort_order INTEGER DEFAULT 0,
 			FOREIGN KEY(category_id) REFERENCES categories(id) ON DELETE CASCADE
 		);
@@ -74,8 +72,7 @@ func (s *SQLiteStore) GetCategories() ([]*domain.Category, error) {
 		SELECT
 			id,
 			name,
-			description,
-			collapsed
+			description
 		FROM categories
 		ORDER BY sort_order ASC`,
 	)
@@ -92,7 +89,6 @@ func (s *SQLiteStore) GetCategories() ([]*domain.Category, error) {
 			&c.ID,
 			&c.Name,
 			&c.Description,
-			&c.Collapsed,
 		); err != nil {
 			return nil, err
 		}
@@ -107,8 +103,7 @@ func (s *SQLiteStore) GetCategories() ([]*domain.Category, error) {
 			category_id,
 			name,
 			description,
-			completion,
-			expanded
+			completion
 		FROM tasks
 		ORDER BY sort_order ASC`,
 	)
@@ -127,7 +122,6 @@ func (s *SQLiteStore) GetCategories() ([]*domain.Category, error) {
 			&t.Name,
 			&t.Description,
 			&t.Completion,
-			&t.Expanded,
 		); err != nil {
 			return nil, err
 		}
@@ -191,8 +185,7 @@ func (s *SQLiteStore) GetCategory(id string) (*domain.Category, error) {
 		SELECT
 			id,
 			name,
-			description,
-			collapsed
+			description
 		FROM categories
 		WHERE id = ?`,
 		id,
@@ -201,7 +194,6 @@ func (s *SQLiteStore) GetCategory(id string) (*domain.Category, error) {
 		&c.ID,
 		&c.Name,
 		&c.Description,
-		&c.Collapsed,
 	); err != nil {
 		return nil, err
 	}
@@ -222,8 +214,7 @@ func (s *SQLiteStore) getTasksForCategory(catID string) ([]*domain.Task, error) 
 			category_id,
 			name,
 			description,
-			completion,
-			expanded
+			completion
 		FROM tasks
 		WHERE category_id = ?
 		ORDER BY sort_order ASC`,
@@ -243,7 +234,6 @@ func (s *SQLiteStore) getTasksForCategory(catID string) ([]*domain.Task, error) 
 			&t.Name,
 			&t.Description,
 			&t.Completion,
-			&t.Expanded,
 		); err != nil {
 			return nil, err
 		}
@@ -326,23 +316,19 @@ func (s *SQLiteStore) UpdateCategory(cat *domain.Category) (*domain.Category, er
 	if err := s.db.QueryRow(
 		`UPDATE categories
 			SET name = ?,
-				description = ?,
-				collapsed = ?
+				description = ?
 			WHERE id = ?
 		RETURNING
 			id,
 			name,
-			description,
-			collapsed`,
+			description`,
 		cat.Name,
 		cat.Description,
-		cat.Collapsed,
 		cat.ID,
 	).Scan(
 		&updated.ID,
 		&updated.Name,
 		&updated.Description,
-		&updated.Collapsed,
 	); err != nil {
 		return nil, err
 	}
@@ -358,14 +344,12 @@ func (s *SQLiteStore) DeleteCategory(id string) (*domain.Category, error) {
 		RETURNING
 			id,
 			name,
-			description,
-			collapsed`,
+			description`,
 		id,
 	).Scan(
 		&removed.ID,
 		&removed.Name,
 		&removed.Description,
-		&removed.Collapsed,
 	); err != nil {
 		return nil, err
 	}
@@ -401,8 +385,7 @@ func (s *SQLiteStore) GetTask(id string) (*domain.Task, error) {
 			category_id,
 			name,
 			description,
-			completion,
-			expanded
+			completion
 		FROM tasks
 		WHERE id = ?`,
 		id,
@@ -412,7 +395,6 @@ func (s *SQLiteStore) GetTask(id string) (*domain.Task, error) {
 		&t.Name,
 		&t.Description,
 		&t.Completion,
-		&t.Expanded,
 	)
 	if err != nil {
 		return nil, err
@@ -461,20 +443,17 @@ func (s *SQLiteStore) UpdateTask(task *domain.Task) (*domain.Task, error) {
 		UPDATE tasks
 		SET name = ?,
 			description = ?,
-			completion = ?,
-			expanded = ?
+			completion = ?
 		WHERE id = ?
 		RETURNING
 			id,
 			category_id,
 			name,
 			description,
-			completion,
-			expanded`,
+			completion`,
 		task.Name,
 		task.Description,
 		task.Completion,
-		task.Expanded,
 		task.ID,
 	).Scan(
 		&updated.ID,
@@ -482,7 +461,6 @@ func (s *SQLiteStore) UpdateTask(task *domain.Task) (*domain.Task, error) {
 		&updated.Name,
 		&updated.Description,
 		&updated.Completion,
-		&updated.Expanded,
 	); err != nil {
 		return nil, err
 	}
@@ -500,8 +478,7 @@ func (s *SQLiteStore) DeleteTask(id string) (*domain.Task, error) {
 			category_id,
 			name,
 			description,
-			completion,
-			expanded`,
+			completion`,
 		id,
 	).Scan(
 		&removed.ID,
@@ -509,7 +486,6 @@ func (s *SQLiteStore) DeleteTask(id string) (*domain.Task, error) {
 		&removed.Name,
 		&removed.Description,
 		&removed.Completion,
-		&removed.Expanded,
 	); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, fmt.Errorf("task not found")
