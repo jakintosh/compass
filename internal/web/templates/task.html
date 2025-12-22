@@ -1,20 +1,20 @@
 {{define "task_name"}}
-<h3 id="task-name-{{.ID}}" class="task-name" {{if .OOB}} hx-swap-oob="true" {{end}}>{{.Name}}</h3>
+<h3 id="task-name-{{.ID}}" class="item-name" {{if .OOB}} hx-swap-oob="true" {{end}}>{{.Name}}</h3>
 {{end}}
 
 {{define "task_percent"}}
-<span id="task-percent-{{.ID}}" class="task-percent" {{if .OOB}} hx-swap-oob="true" {{end}}>{{.Completion}}%</span>
+<span id="task-percent-{{.ID}}" class="item-percent" {{if .OOB}} hx-swap-oob="true" {{end}}>{{.Completion}}%</span>
 {{end}}
 
 {{define "task_progress_fill"}}
-<div id="task-progress-fill-{{.ID}}" class="task-progress-fill" style="width: {{.Completion}}%" {{if .OOB}}
+<div id="task-progress-fill-{{.ID}}" class="progress-fill" style="width: {{.Completion}}%" {{if .OOB}}
     hx-swap-oob="true" {{end}}></div>
 {{end}}
 
 <li class="task-item" id="task-{{.ID}}" data-id="{{.ID}}" {{if .OOB}} hx-swap-oob="true" {{end}}>
-    <div class="task">
+    <div class="row task">
         <!-- Drag handle -->
-        <div class="drag-handle">
+        <div class="drag-handle hover-reveal">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                 stroke-linecap="round" stroke-linejoin="round">
                 <circle cx="9" cy="12" r="1" />
@@ -42,14 +42,14 @@
         <span class="subtask-indicator">{{len .Subtasks}}</span>
         {{end}}
 
-        <span class="task-spacer"></span>
+        <span class="item-spacer"></span>
 
         {{if .HasSubtasks}}
-        <div class="task-progress-bar">
+        <div class="progress-bar">
             {{template "task_progress_fill" .}}
         </div>
         {{else}}
-        <div class="task-slider">
+        <div class="item-slider">
             <input type="range" min="0" max="100" value="{{.Completion}}" class="range-slider" name="completion"
                 hx-patch="/tasks/{{.ID}}" hx-trigger="change" hx-swap="none">
         </div>
@@ -58,7 +58,7 @@
         {{template "task_percent" .}}
 
         <!-- Edit button -->
-        <button class="btn-edit-icon" hx-get="/tasks/{{.ID}}/details" hx-target="#slideover-container"
+        <button class="btn-edit-icon hover-reveal" hx-get="/tasks/{{.ID}}/details" hx-target="#slideover-container"
             hx-swap="innerHTML">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                 stroke-linecap="round" stroke-linejoin="round">

@@ -8,9 +8,9 @@
 {{end}}
 
 <li class="category" id="category-{{.ID}}" data-id="{{.ID}}" {{if .OOB}} hx-swap-oob="true" {{end}}>
-    <div class="category-header">
+    <div class="row category-header">
         <!-- Drag handle -->
-        <div class="drag-handle">
+        <div class="drag-handle hover-reveal">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                 stroke-linecap="round" stroke-linejoin="round">
                 <circle cx="9" cy="12" r="1" />
@@ -38,7 +38,7 @@
         </div>
 
         <!-- Edit button on far right -->
-        <button class="btn-edit-icon" hx-get="/categories/{{.ID}}/details" hx-target="#slideover-container"
+        <button class="btn-edit-icon hover-reveal" hx-get="/categories/{{.ID}}/details" hx-target="#slideover-container"
             hx-swap="innerHTML">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                 stroke-linecap="round" stroke-linejoin="round">

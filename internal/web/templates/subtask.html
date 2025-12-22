@@ -1,14 +1,14 @@
 {{define "subtask_name"}}
-<span id="subtask-name-{{.ID}}" class="task-name" {{if .OOB}} hx-swap-oob="true" {{end}}>{{.Name}}</span>
+<span id="subtask-name-{{.ID}}" class="item-name" {{if .OOB}} hx-swap-oob="true" {{end}}>{{.Name}}</span>
 {{end}}
 
 {{define "subtask_percent"}}
-<span id="subtask-percent-{{.ID}}" class="task-percent" {{if .OOB}} hx-swap-oob="true" {{end}}>{{.Completion}}%</span>
+<span id="subtask-percent-{{.ID}}" class="item-percent" {{if .OOB}} hx-swap-oob="true" {{end}}>{{.Completion}}%</span>
 {{end}}
 
-<li class="subtask" id="subtask-{{.ID}}" data-id="{{.ID}}" {{if .OOB}} hx-swap-oob="true" {{end}}>
+<li class="row subtask" id="subtask-{{.ID}}" data-id="{{.ID}}" {{if .OOB}} hx-swap-oob="true" {{end}}>
     <!-- Drag handle -->
-    <div class="drag-handle">
+    <div class="drag-handle hover-reveal">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
             stroke-linecap="round" stroke-linejoin="round">
             <circle cx="9" cy="12" r="1" />
@@ -22,9 +22,9 @@
 
     {{template "subtask_name" .}}
 
-    <span class="task-spacer"></span>
+    <span class="item-spacer"></span>
 
-    <div class="task-slider">
+    <div class="item-slider">
         <input type="range" min="0" max="100" value="{{.Completion}}" class="range-slider" name="completion"
             hx-patch="/subtasks/{{.ID}}" hx-trigger="change" hx-swap="none">
     </div>
@@ -32,7 +32,7 @@
     {{template "subtask_percent" .}}
 
     <!-- Edit button -->
-    <button class="btn-edit-icon" hx-get="/subtasks/{{.ID}}/details" hx-target="#slideover-container"
+    <button class="btn-edit-icon hover-reveal" hx-get="/subtasks/{{.ID}}/details" hx-target="#slideover-container"
         hx-swap="innerHTML">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
             stroke-linecap="round" stroke-linejoin="round">
