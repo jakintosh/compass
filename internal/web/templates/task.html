@@ -35,7 +35,32 @@
     class="task-item"
     id="task-{{.ID}}"
     data-id="{{.ID}}"
-    x-data="{ collapsed: true }"
+    _="
+        init
+            set @data-storage-key to 'ui.task.' + @data-id + '.collapsed'
+            set stored to localStorage.getItem(@data-storage-key)
+            if stored is null
+                set stored to 'true'
+            end
+            set @data-collapsed to stored
+            set button to the <.expand-toggle-btn/> in me
+            set list to the <.subtasks-list/> in me
+            set indicator to the <.subtask-indicator/> in me
+            if @data-collapsed == 'true'
+                add .collapsed to button
+                add .hidden to list
+                if indicator is not null
+                    remove .hidden from indicator
+                end
+            else
+                remove .collapsed from button
+                remove .hidden from list
+                if indicator is not null
+                    add .hidden to indicator
+                end
+            end
+        end
+    "
     {{if
     .OOB}}
     hx-swap-oob="true"
@@ -67,8 +92,32 @@
         <button
             type="button"
             class="expand-toggle-btn"
-            :class="{ collapsed: collapsed }"
-            @click="collapsed = !collapsed"
+            _="
+                on click
+                    set container to closest <li/>
+                    set list to the <.subtasks-list/> in container
+                    set indicator to the <.subtask-indicator/> in container
+                    if container@data-collapsed == 'true'
+                        set container@data-collapsed to 'false'
+                    else
+                        set container@data-collapsed to 'true'
+                    end
+                    if container@data-collapsed == 'true'
+                        add .collapsed to me
+                        add .hidden to list
+                        if indicator is not null
+                            remove .hidden from indicator
+                        end
+                    else
+                        remove .collapsed from me
+                        remove .hidden from list
+                        if indicator is not null
+                            add .hidden to indicator
+                        end
+                    end
+                    set storageKey to 'ui.task.' + container@data-id + '.collapsed'
+                    localStorage.setItem(storageKey, container@data-collapsed)
+            "
         >
             <svg
                 class="task-expand-indicator"
@@ -86,9 +135,7 @@
         </button>
 
         {{template "task_name" .}} {{if .HasSubtasks}}
-        <span class="subtask-indicator" x-show="collapsed"
-            >{{len .Subtasks}}</span
-        >
+        <span class="subtask-indicator">{{len .Subtasks}}</span>
         {{end}}
 
         <span class="item-spacer"></span>
@@ -139,11 +186,7 @@
     </div>
 
     <!-- Subtasks section -->
-    <ul
-        id="subtasks-list-{{.ID}}"
-        class="subtasks-list"
-        :class="{ hidden: collapsed }"
-    >
+    <ul id="subtasks-list-{{.ID}}" class="subtasks-list">
         {{range .Subtasks}} {{template "subtask.html" .}} {{end}}
         <li class="subtask-add-item">
             <button

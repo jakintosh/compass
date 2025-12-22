@@ -15,7 +15,25 @@
     class="category"
     id="category-{{.ID}}"
     data-id="{{.ID}}"
-    x-data="{ collapsed: false }"
+    _="
+        init
+            set @data-storage-key to 'ui.category.' + @data-id + '.collapsed'
+            set stored to localStorage.getItem(@data-storage-key)
+            if stored is null
+                set stored to 'false'
+            end
+            set @data-collapsed to stored
+            set button to the <.expand-toggle-btn/> in me
+            set list to the <.tasks-list/> in me
+            if @data-collapsed == 'true'
+                add .collapsed to button
+                add .hidden to list
+            else
+                remove .collapsed from button
+                remove .hidden from list
+            end
+        end
+    "
     {{if
     .OOB}}
     hx-swap-oob="true"
@@ -47,8 +65,25 @@
         <button
             type="button"
             class="expand-toggle-btn"
-            :class="{ collapsed: collapsed }"
-            @click="collapsed = !collapsed"
+            _="
+                on click
+                    set container to closest <li/>
+                    set list to the <.tasks-list/> in container
+                    if container@data-collapsed == 'true'
+                        set container@data-collapsed to 'false'
+                    else
+                        set container@data-collapsed to 'true'
+                    end
+                    if container@data-collapsed == 'true'
+                        add .collapsed to me
+                        add .hidden to list
+                    else
+                        remove .collapsed from me
+                        remove .hidden from list
+                    end
+                    set storageKey to 'ui.category.' + container@data-id + '.collapsed'
+                    localStorage.setItem(storageKey, container@data-collapsed)
+            "
         >
             <svg
                 class="category-toggle-icon"
@@ -98,12 +133,7 @@
         </button>
     </div>
 
-    <ul
-        class="tasks-list"
-        :class="{ hidden: collapsed }"
-        id="tasks-list-{{.ID}}"
-        data-category-id="{{.ID}}"
-    >
+    <ul class="tasks-list" id="tasks-list-{{.ID}}" data-category-id="{{.ID}}">
         {{range .Tasks}} {{template "task.html" .}} {{end}}
 
         <li class="task-add-item">

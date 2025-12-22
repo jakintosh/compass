@@ -1,8 +1,8 @@
 document.addEventListener("htmx:load", function (evt) {
-  if (window.Alpine) {
+  if (window._hyperscript && window._hyperscript.processNode) {
     const target = evt.detail && evt.detail.elt ? evt.detail.elt : evt.target;
-    if (target) {
-      Alpine.initTree(target);
+    if (target && target !== document.body) {
+      window._hyperscript.processNode(target);
     }
   }
 
