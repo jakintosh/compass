@@ -33,9 +33,6 @@ document.addEventListener("htmx:load", function (evt) {
         draggable: ".task-item",
         handle: ".drag-handle",
         ghostClass: "ghost",
-        onMove: function (evt) {
-          return !evt.related.classList.contains("task-add-item");
-        },
         onEnd: function () {
           let catId = el.getAttribute("data-category-id");
           let ids = [];
@@ -57,7 +54,7 @@ document.addEventListener("htmx:load", function (evt) {
   });
 
   // Initialize Sortable for Subtasks
-  document.querySelectorAll("[id^=subtasks-list-]").forEach(function (el) {
+  document.querySelectorAll(".subtasks-list").forEach(function (el) {
     if (!el.sortableInitialized) {
       new Sortable(el, {
         group: "subtasks-" + el.id,
@@ -65,9 +62,6 @@ document.addEventListener("htmx:load", function (evt) {
         draggable: ".subtask",
         handle: ".drag-handle",
         ghostClass: "ghost",
-        onMove: function (evt) {
-          return !evt.related.classList.contains("subtask-add-item");
-        },
         onEnd: function (evt) {
           let taskId = el.id.replace("subtasks-list-", "");
           let ids = [];

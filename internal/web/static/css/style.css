@@ -7,11 +7,11 @@
 :root {
     /* Colors - Monochrome */
     --color-bg: #ffffff;
-    --color-surface: #fafafa;
+    --color-surface: #eeeeee;
     --color-text: #18181b;
     --color-text-muted: #71717a;
     --color-text-faint: #a1a1aa;
-    --color-border: #e4e4e7;
+    --color-border: #dddddd;
 
     /* Accent - Fuschia (used sparingly) */
     --color-accent: #ef4687;
@@ -70,7 +70,6 @@ body {
 .app {
     display: flex;
     flex-direction: column;
-    height: 100%;
     max-width: 48rem;
     margin: 0 auto;
     padding: var(--space-xl);
@@ -81,8 +80,6 @@ body {
     justify-content: space-between;
     align-items: flex-end;
     padding-bottom: var(--space-md);
-    margin-bottom: var(--space-2xl);
-    border-bottom: 1px solid var(--color-border);
 }
 
 .app-title {
@@ -121,7 +118,12 @@ body {
     display: flex;
     gap: var(--space-sm);
     padding: var(--space-sm);
+    border-top: 1px solid var(--color-border);
     transition: background-color var(--transition-fast);
+}
+
+.category > .row {
+    padding: var(--space-md);
 }
 
 .row:has(.drag-handle:hover) {
@@ -170,6 +172,7 @@ body {
     display: inline-flex;
     align-items: center;
     gap: var(--space-sm);
+    padding: var(--space-xs);
 }
 
 .btn-add .arrow {
@@ -236,26 +239,16 @@ body {
     padding: 0;
     display: flex;
     flex-direction: column;
-    gap: var(--space-2xl);
-}
-
-.tasks-list {
-    list-style: none;
-    margin: 0;
-    padding: 0;
     border-left: 1px solid var(--color-border);
-    margin-left: var(--space-md);
-    min-height: 40px;
 }
 
+.tasks-list,
 .subtasks-list {
-    display: flex;
-    flex-direction: column;
     list-style: none;
     margin: 0;
     padding: 0;
-    margin-left: calc(var(--space-md) + 14px);
-    margin-bottom: var(--space-sm);
+    margin-left: var(--space-xl);
+    margin-bottom: var(--space-md);
     border-left: 1px solid var(--color-border);
 }
 
@@ -297,10 +290,6 @@ body {
     list-style: none;
 }
 
-.category-header {
-    margin-bottom: var(--space-sm);
-}
-
 .category-info {
     display: flex;
     flex-direction: column;
@@ -323,23 +312,11 @@ body {
     display: none;
 }
 
-.category.collapsed > .category-header {
-    margin-bottom: 0;
-}
-
 /* ==========================================
    Task
    ========================================== */
 .task-item {
     list-style: none;
-}
-
-.task {
-    border-bottom: 1px solid var(--color-border);
-}
-
-.task-item:last-of-type > .task {
-    border-bottom: none;
 }
 
 .task-item .subtask-indicator {
@@ -355,31 +332,18 @@ body {
 }
 
 /* ==========================================
-   Subtask
-   ========================================== */
-.subtask {
-    padding-right: var(--space-sm);
-    border-bottom: 1px solid var(--color-border);
-}
-
-.subtask:last-of-type {
-    border-bottom: none;
-}
-
-/* ==========================================
    Add Items
    ========================================== */
-.subtask-add-item,
-.task-add-item {
+.add-item {
+    display: list-item;
     list-style: none;
     padding: var(--space-sm) 0;
-    padding-left: calc(14px + var(--space-sm));
+    padding-left: calc(14px + 2 * var(--space-sm));
     opacity: 0.7;
     transition: opacity 0.2s;
 }
 
-.subtask-add-item:hover,
-.task-add-item:hover {
+.add-item:hover {
     opacity: 1;
 }
 
@@ -389,7 +353,7 @@ body {
 .progress-bar {
     height: 4px;
     width: 160px;
-    background-color: var(--color-border);
+    background-color: var(--color-surface);
     border-radius: 999px;
     margin-top: var(--space-sm);
     overflow: hidden;
@@ -523,39 +487,20 @@ body {
     transform: translate(calc(-0.5 * var(--space-sm)), -50%);
 }
 
-/* Category toggle icon */
-.expand-toggle-btn .category-toggle-icon {
-    color: var(--color-text-faint);
-    transition:
-        transform var(--transition-fast),
-        color var(--transition-fast);
-}
-
-.category.collapsed .expand-toggle-btn .category-toggle-icon {
-    transform: rotate(-90deg);
-}
-
-.expand-toggle-btn:hover .category-toggle-icon,
-.category-header:hover .expand-toggle-btn .category-toggle-icon {
-    color: var(--color-text);
-}
-
-/* Task expand indicator */
-svg.task-expand-indicator {
+/* Expand toggle icon */
+.expand-toggle-icon {
     flex-shrink: 0;
     color: var(--color-text-faint);
     transition:
         transform var(--transition-fast),
         color var(--transition-fast);
+}
+
+:is(.category, .task-item).collapsed .expand-toggle-icon {
     transform: rotate(-90deg);
 }
 
-.task-item:not(.collapsed) .expand-toggle-btn svg.task-expand-indicator {
-    transform: rotate(0deg);
-}
-
-.task:hover svg.task-expand-indicator,
-.expand-toggle-btn:hover svg.task-expand-indicator {
+.expand-toggle-btn:hover .expand-toggle-icon {
     color: var(--color-text);
 }
 

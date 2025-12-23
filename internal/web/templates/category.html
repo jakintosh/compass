@@ -1,24 +1,44 @@
 {{define "category_meta"}}
-<span id="category-meta-{{.ID}}" class="category-meta" {{if .OOB}}hx-swap-oob="true" {{end}}>{{.AverageCompletion}}%
-    complete</span>
-{{end}}
-
-{{define "category_delete"}}
+<span
+    id="category-meta-{{.ID}}"
+    class="category-meta"
+    {{if
+    .OOB}}hx-swap-oob="true"
+    {{end}}
+    >{{.AverageCompletion}}% complete</span
+>
+{{end}} {{define "category_delete"}}
 <li id="category-{{.ID}}" hx-swap-oob="delete"></li>
 {{end}}
 
-<li class="category" id="category-{{.ID}}" data-id="{{.ID}}" {{if .OOB}}hx-swap-oob="true" {{end}} _="
+<li
+    class="category"
+    id="category-{{.ID}}"
+    data-id="{{.ID}}"
+    {{if
+    .OOB}}hx-swap-oob="true"
+    {{end}}
+    _="
         init
             if localStorage.getItem('ui.category.' + @data-id + '.collapsed') is 'true'
                 add .collapsed to me
             end
         end
-    ">
+    "
+>
     <div class="row category-header">
         <!-- Drag handle -->
         <div class="drag-handle hover-reveal">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                stroke-linecap="round" stroke-linejoin="round">
+            <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+            >
                 <circle cx="9" cy="12" r="1" />
                 <circle cx="9" cy="5" r="1" />
                 <circle cx="9" cy="19" r="1" />
@@ -29,14 +49,27 @@
         </div>
 
         <!-- Collapse/expand arrow indicator (clickable toggle button) -->
-        <button type="button" class="expand-toggle-btn" _="
+        <button
+            type="button"
+            class="expand-toggle-btn"
+            _="
                 on click
                     set container to closest <li/>
                     toggle .collapsed on container
                     localStorage.setItem('ui.category.' + container@data-id + '.collapsed', container matches .collapsed)
-            ">
-            <svg class="category-toggle-icon" width="16" height="16" viewBox="0 0 24 24" fill="none"
-                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            "
+        >
+            <svg
+                class="expand-toggle-icon"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+            >
                 <polyline points="6 9 12 15 18 9"></polyline>
             </svg>
         </button>
@@ -48,12 +81,28 @@
         </div>
 
         <!-- Edit button on far right -->
-        <button class="btn-edit-icon hover-reveal" hx-get="/categories/{{.ID}}/details" hx-target="#slideover-container"
-            hx-swap="innerHTML">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                stroke-linecap="round" stroke-linejoin="round">
-                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+        <button
+            class="btn-edit-icon hover-reveal"
+            hx-get="/categories/{{.ID}}/details"
+            hx-target="#slideover-container"
+            hx-swap="innerHTML"
+        >
+            <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+            >
+                <path
+                    d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"
+                ></path>
+                <path
+                    d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"
+                ></path>
             </svg>
         </button>
     </div>
@@ -61,9 +110,13 @@
     <ul class="tasks-list" id="tasks-list-{{.ID}}" data-category-id="{{.ID}}">
         {{range .Tasks}} {{template "task.html" .}} {{end}}
 
-        <li class="task-add-item">
-            <button class="btn btn-add" hx-post="/categories/{{.ID}}/tasks" hx-target="closest li"
-                hx-swap="beforebegin">
+        <li class="row add-item">
+            <button
+                class="btn btn-add"
+                hx-post="/categories/{{.ID}}/tasks"
+                hx-target="closest li"
+                hx-swap="beforebegin"
+            >
                 <span class="arrow">→</span>
                 <span>Add a task</span>
             </button>
