@@ -10,7 +10,7 @@ import (
 
 func main() {
 	// Initialize Store
-	s, err := store.NewSQLiteStore("todo.db")
+	s, err := store.NewSQLiteStore("todo.db", true)
 	if err != nil {
 		log.Fatalf("Failed to initialize store: %v", err)
 	}

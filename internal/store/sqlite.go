@@ -14,13 +14,36 @@ type SQLiteStore struct {
 	db *sql.DB
 }
 
-func NewSQLiteStore(path string) (*SQLiteStore, error) {
+func NewSQLiteStore(path string, wal bool) (*SQLiteStore, error) {
+	const busyTimeoutMS = 5000
+
 	db, err := sql.Open("sqlite", path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
 
+	// Serialize writes to avoid overlapping write transactions.
+	db.SetMaxOpenConns(1)
+
+	if _, err := db.Exec("PRAGMA foreign_keys = ON;"); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("failed to enable foreign keys: %w", err)
+	}
+
+	if wal {
+		if _, err := db.Exec("PRAGMA journal_mode = WAL;"); err != nil {
+			db.Close()
+			return nil, fmt.Errorf("failed to enable WAL mode: %w", err)
+		}
+	}
+
+	if _, err := db.Exec(fmt.Sprintf("PRAGMA busy_timeout = %d;", busyTimeoutMS)); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("failed to set busy timeout: %w", err)
+	}
+
 	if err := db.Ping(); err != nil {
+		db.Close()
 		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}
 
@@ -68,7 +91,8 @@ func (s *SQLiteStore) migrate() error {
 }
 
 func (s *SQLiteStore) GetCategories() ([]*domain.Category, error) {
-	rows, err := s.db.Query(`
+	// get all categories
+	categoryRows, err := s.db.Query(`
 		SELECT
 			id,
 			name,
@@ -79,21 +103,27 @@ func (s *SQLiteStore) GetCategories() ([]*domain.Category, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 
-	// get all categories
 	var categories []*domain.Category
-	for rows.Next() {
+	for categoryRows.Next() {
 		var c domain.Category
-		if err := rows.Scan(
+		if err := categoryRows.Scan(
 			&c.ID,
 			&c.Name,
 			&c.Description,
 		); err != nil {
+			categoryRows.Close()
 			return nil, err
 		}
 		c.Tasks = []*domain.Task{} // Initialize slice
 		categories = append(categories, &c)
+	}
+	if err := categoryRows.Err(); err != nil {
+		categoryRows.Close()
+		return nil, err
+	}
+	if err := categoryRows.Close(); err != nil {
+		return nil, err
 	}
 
 	// get all tasks
@@ -110,7 +140,6 @@ func (s *SQLiteStore) GetCategories() ([]*domain.Category, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer taskRows.Close()
 
 	tasksByCat := make(map[string][]*domain.Task)
 	var allTasks []*domain.Task
@@ -123,11 +152,19 @@ func (s *SQLiteStore) GetCategories() ([]*domain.Category, error) {
 			&t.Description,
 			&t.Completion,
 		); err != nil {
+			taskRows.Close()
 			return nil, err
 		}
 		t.Subtasks = []*domain.Subtask{}
 		tasksByCat[t.CategoryID] = append(tasksByCat[t.CategoryID], &t)
 		allTasks = append(allTasks, &t)
+	}
+	if err := taskRows.Err(); err != nil {
+		taskRows.Close()
+		return nil, err
+	}
+	if err := taskRows.Close(); err != nil {
+		return nil, err
 	}
 
 	// get all subtasks
@@ -145,7 +182,6 @@ func (s *SQLiteStore) GetCategories() ([]*domain.Category, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer subRows.Close()
 
 	subsByTask := make(map[string][]*domain.Subtask)
 	for subRows.Next() {
@@ -161,6 +197,13 @@ func (s *SQLiteStore) GetCategories() ([]*domain.Category, error) {
 			return nil, err
 		}
 		subsByTask[sub.TaskID] = append(subsByTask[sub.TaskID], &sub)
+	}
+	if err := subRows.Err(); err != nil {
+		subRows.Close()
+		return nil, err
+	}
+	if err := subRows.Close(); err != nil {
+		return nil, err
 	}
 
 	// Assemble
@@ -208,7 +251,7 @@ func (s *SQLiteStore) GetCategory(id string) (*domain.Category, error) {
 }
 
 func (s *SQLiteStore) getTasksForCategory(catID string) ([]*domain.Task, error) {
-	rows, err := s.db.Query(`
+	taskRows, err := s.db.Query(`
 		SELECT
 			id,
 			category_id,
@@ -223,34 +266,43 @@ func (s *SQLiteStore) getTasksForCategory(catID string) ([]*domain.Task, error) 
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 
 	var tasks []*domain.Task
-	for rows.Next() {
+	for taskRows.Next() {
 		var t domain.Task
-		if err := rows.Scan(
+		if err := taskRows.Scan(
 			&t.ID,
 			&t.CategoryID,
 			&t.Name,
 			&t.Description,
 			&t.Completion,
 		); err != nil {
+			taskRows.Close()
 			return nil, err
 		}
 
+		tasks = append(tasks, &t)
+	}
+	if err := taskRows.Err(); err != nil {
+		taskRows.Close()
+		return nil, err
+	}
+	if err := taskRows.Close(); err != nil {
+		return nil, err
+	}
+
+	for _, t := range tasks {
 		subs, err := s.getSubtasksForTask(t.ID)
 		if err != nil {
 			return nil, err
 		}
 		t.Subtasks = subs
-
-		tasks = append(tasks, &t)
 	}
 	return tasks, nil
 }
 
 func (s *SQLiteStore) getSubtasksForTask(taskID string) ([]*domain.Subtask, error) {
-	rows, err := s.db.Query(`
+	subtaskRows, err := s.db.Query(`
 		SELECT
 			id,
 			task_id,
@@ -266,12 +318,12 @@ func (s *SQLiteStore) getSubtasksForTask(taskID string) ([]*domain.Subtask, erro
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer subtaskRows.Close()
 
 	var subs []*domain.Subtask
-	for rows.Next() {
+	for subtaskRows.Next() {
 		var sub domain.Subtask
-		if err := rows.Scan(
+		if err := subtaskRows.Scan(
 			&sub.ID,
 			&sub.TaskID,
 			&sub.CategoryID,
