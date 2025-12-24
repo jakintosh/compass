@@ -18,7 +18,7 @@ type Presentation struct {
 func NewPresentation() (*Presentation, error) {
 	tmpl := template.New("base")
 
-	tmpl, err := tmpl.ParseFS(templateFS, "templates/*.html")
+	tmpl, err := tmpl.ParseFS(templateFS, "templates/*")
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse templates: %w", err)
 	}

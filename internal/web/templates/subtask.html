@@ -1,46 +1,15 @@
 {{define "subtask_name"}}
-<span
-    id="subtask-name-{{.ID}}"
-    class="item-name"
-    {{if
-    .OOB}}
-    hx-swap-oob="true"
-    {{end}}
-    >{{.Name}}</span
->
-{{end}} {{define "subtask_percent"}}
-<span
-    id="subtask-percent-{{.ID}}"
-    class="item-percent"
-    {{if
-    .OOB}}
-    hx-swap-oob="true"
-    {{end}}
-    >{{.Completion}}%</span
->
+<span id="subtask-name-{{.ID}}" class="item-name" {{if .OOB}} hx-swap-oob="true" {{end}}>{{.Name}}</span>
 {{end}}
 
-<li
-    class="row subtask"
-    id="subtask-{{.ID}}"
-    data-id="{{.ID}}"
-    {{if
-    .OOB}}
-    hx-swap-oob="true"
-    {{end}}
->
+{{define "subtask_percent"}}
+<span id="subtask-percent-{{.ID}}" class="item-percent" {{if .OOB}} hx-swap-oob="true" {{end}} >{{.Completion}}%</span>
+{{end}}
+
+<li class="row subtask" id="subtask-{{.ID}}" data-id="{{.ID}}" {{if .OOB}} hx-swap-oob="true" {{end}}>
     <!-- Drag handle -->
     <div class="drag-handle hover-reveal">
-        <svg
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-        >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="9" cy="12" r="1" />
             <circle cx="9" cy="5" r="1" />
             <circle cx="9" cy="19" r="1" />
@@ -55,44 +24,16 @@
     <span class="item-spacer"></span>
 
     <div class="item-slider">
-        <input
-            type="range"
-            min="0"
-            max="100"
-            value="{{.Completion}}"
-            class="range-slider"
-            name="completion"
-            hx-patch="/subtasks/{{.ID}}"
-            hx-trigger="change"
-            hx-swap="none"
-        />
+        <input type="range" min="0" max="100" value="{{.Completion}}" class="range-slider" name="completion" hx-patch="/subtasks/{{.ID}}" hx-trigger="change" hx-swap="none" hx-sync="this:replace"/>
     </div>
 
     {{template "subtask_percent" .}}
 
     <!-- Edit button -->
-    <button
-        class="btn-edit-icon hover-reveal"
-        hx-get="/subtasks/{{.ID}}/details"
-        hx-target="#slideover-container"
-        hx-swap="innerHTML"
-    >
-        <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-        >
-            <path
-                d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"
-            ></path>
-            <path
-                d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"
-            ></path>
+    <button class="btn-edit-icon hover-reveal" hx-get="/subtasks/{{.ID}}/details" hx-target="#slideover-container" hx-swap="innerHTML">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
         </svg>
     </button>
 </li>

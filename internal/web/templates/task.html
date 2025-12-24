@@ -1,65 +1,22 @@
 {{define "task_name"}}
-<h3
-    id="task-name-{{.ID}}"
-    class="item-name"
-    {{if
-    .OOB}}
-    hx-swap-oob="true"
-    {{end}}
->
+<h3 id="task-name-{{.ID}}" class="item-name" {{if .OOB}}hx-swap-oob="true"{{end}}>
     {{.Name}}
 </h3>
-{{end}} {{define "task_percent"}}
-<span
-    id="task-percent-{{.ID}}"
-    class="item-percent"
-    {{if
-    .OOB}}
-    hx-swap-oob="true"
-    {{end}}
-    >{{.Completion}}%</span
->
-{{end}} {{define "task_progress_fill"}}
-<div
-    id="task-progress-fill-{{.ID}}"
-    class="progress-fill"
-    style="width: {{.Completion}}%"
-    {{if
-    .OOB}}
-    hx-swap-oob="true"
-    {{end}}
-></div>
 {{end}}
 
-<li
-    class="task-item"
-    id="task-{{.ID}}"
-    data-id="{{.ID}}"
-    _="
-        init
-            if localStorage.getItem('ui.task.' + @data-id + '.collapsed') is not 'false'
-                add .collapsed to me
-            end
-        end
-    "
-    {{if
-    .OOB}}
-    hx-swap-oob="true"
-    {{end}}
->
+{{define "task_percent"}}
+<span id="task-percent-{{.ID}}" class="item-percent" {{if .OOB}}hx-swap-oob="true"{{end}}>{{.Completion}}%</span>
+{{end}}
+
+{{define "task_progress_fill"}}
+<div id="task-progress-fill-{{.ID}}" class="progress-fill" style="width: {{.Completion}}%" {{if .OOB}}hx-swap-oob="true"{{end}}></div>
+{{end}}
+
+<li class="task-item" id="task-{{.ID}}" data-id="{{.ID}}" data-ui-key="ui.task.{{.ID}}.collapsed" data-ui-class="collapsed" {{if .OOB}}hx-swap-oob="true"{{end}}>
     <div class="row">
         <!-- Drag handle -->
         <div class="drag-handle hover-reveal">
-            <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-            >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <circle cx="9" cy="12" r="1" />
                 <circle cx="9" cy="5" r="1" />
                 <circle cx="9" cy="19" r="1" />
@@ -70,34 +27,19 @@
         </div>
 
         <!-- Expand/collapse arrow (clickable toggle button) -->
-        <button
-            type="button"
-            class="expand-toggle-btn"
-            _="
-                on click
-                    set container to closest <li/>
-                    toggle .collapsed on container
-                    localStorage.setItem('ui.task.' + container@data-id + '.collapsed', container matches .collapsed)
-            "
+        <button type="button" class="expand-toggle-btn" _="
+            on click
+                set container to closest <li/>
+                toggle .collapsed on container
+                localStorage.setItem(container@data-ui-key, container matches .collapsed)"
         >
-            <svg
-                class="expand-toggle-icon"
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-            >
+            <svg class="expand-toggle-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" >
                 <polyline points="6 9 12 15 18 9"></polyline>
             </svg>
         </button>
 
-        {{template "task_name" .}} {{if .HasSubtasks}}
-        <span class="subtask-indicator">{{len .Subtasks}}</span>
-        {{end}}
+        {{template "task_name" .}}
+        {{if .HasSubtasks}}<span class="subtask-indicator">{{len .Subtasks}}</span>{{end}}
 
         <span class="item-spacer"></span>
 
@@ -105,43 +47,17 @@
         <div class="progress-bar">{{template "task_progress_fill" .}}</div>
         {{else}}
         <div class="item-slider">
-            <input
-                type="range"
-                min="0"
-                max="100"
-                value="{{.Completion}}"
-                class="range-slider"
-                name="completion"
-                hx-patch="/tasks/{{.ID}}"
-                hx-trigger="change"
-                hx-swap="none"
-            />
+            <input type="range" min="0" max="100" value="{{.Completion}}" class="range-slider" name="completion" hx-patch="/tasks/{{.ID}}" hx-trigger="change" hx-swap="none" hx-sync="this:replace"/>
         </div>
-        {{end}} {{template "task_percent" .}}
+        {{end}}
+
+        {{template "task_percent" .}}
 
         <!-- Edit button -->
-        <button
-            class="btn-edit-icon hover-reveal"
-            hx-get="/tasks/{{.ID}}/details"
-            hx-target="#slideover-container"
-            hx-swap="innerHTML"
-        >
-            <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-            >
-                <path
-                    d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"
-                ></path>
-                <path
-                    d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"
-                ></path>
+        <button class="btn-edit-icon hover-reveal" hx-get="/tasks/{{.ID}}/details" hx-target="#slideover-container" hx-swap="innerHTML">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
             </svg>
         </button>
     </div>
@@ -150,12 +66,7 @@
     <ul id="subtasks-list-{{.ID}}" class="subtasks-list">
         {{range .Subtasks}} {{template "subtask.html" .}} {{end}}
         <li class="row add-item">
-            <button
-                class="btn btn-add"
-                hx-post="/tasks/{{.ID}}/subtasks"
-                hx-target="closest li"
-                hx-swap="beforebegin"
-            >
+            <button class="btn btn-add" hx-post="/tasks/{{.ID}}/subtasks" hx-target="closest li" hx-swap="beforebegin">
                 <span class="arrow">→</span>
                 <span>Add a subtask</span>
             </button>
