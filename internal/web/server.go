@@ -1,6 +1,7 @@
 package web
 
 import (
+	"bytes"
 	"net/http"
 	"strconv"
 	"strings"
@@ -190,9 +191,12 @@ func (s *Server) handleCreateTask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	catView := NewCategoryView(cat, true)
-	if err := s.presentation.RenderCategoryOOB(w, catView); err != nil {
+	var buf bytes.Buffer
+	if err := s.presentation.RenderCategoryOOB(&buf, catView); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
+	w.Write(buf.Bytes())
 }
 
 func (s *Server) handleUpdateTask(w http.ResponseWriter, r *http.Request) {
@@ -242,9 +246,12 @@ func (s *Server) handleUpdateTask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	catView := NewCategoryView(cat, true)
-	if err := s.presentation.RenderCategoryOOB(w, catView); err != nil {
+	var buf bytes.Buffer
+	if err := s.presentation.RenderCategoryOOB(&buf, catView); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
+	w.Write(buf.Bytes())
 }
 
 func (s *Server) handleGetSubtaskDetails(w http.ResponseWriter, r *http.Request) {
@@ -338,9 +345,12 @@ func (s *Server) handleCreateSubtask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	catView := NewCategoryView(cat, true)
-	if err := s.presentation.RenderCategoryOOB(w, catView); err != nil {
+	var buf bytes.Buffer
+	if err := s.presentation.RenderCategoryOOB(&buf, catView); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
+	w.Write(buf.Bytes())
 }
 
 func (s *Server) handleUpdateSubtask(w http.ResponseWriter, r *http.Request) {
@@ -389,9 +399,12 @@ func (s *Server) handleUpdateSubtask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	catView := NewCategoryView(cat, true)
-	if err := s.presentation.RenderCategoryOOB(w, catView); err != nil {
+	var buf bytes.Buffer
+	if err := s.presentation.RenderCategoryOOB(&buf, catView); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
+	w.Write(buf.Bytes())
 }
 
 func (s *Server) handleReorderCategories(w http.ResponseWriter, r *http.Request) {
@@ -512,9 +525,12 @@ func (s *Server) handleDeleteTask(w http.ResponseWriter, r *http.Request) {
 
 	s.presentation.RenderSlideoverClear(w)
 	catView := NewCategoryView(cat, true)
-	if err := s.presentation.RenderCategoryOOB(w, catView); err != nil {
+	var buf bytes.Buffer
+	if err := s.presentation.RenderCategoryOOB(&buf, catView); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
+	w.Write(buf.Bytes())
 }
 
 func (s *Server) handleDeleteSubtask(w http.ResponseWriter, r *http.Request) {
@@ -545,7 +561,10 @@ func (s *Server) handleDeleteSubtask(w http.ResponseWriter, r *http.Request) {
 
 	s.presentation.RenderSlideoverClear(w)
 	catView := NewCategoryView(cat, true)
-	if err := s.presentation.RenderCategoryOOB(w, catView); err != nil {
+	var buf bytes.Buffer
+	if err := s.presentation.RenderCategoryOOB(&buf, catView); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
+	w.Write(buf.Bytes())
 }
