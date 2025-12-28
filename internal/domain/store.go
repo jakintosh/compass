@@ -19,4 +19,10 @@ type Store interface {
 	UpdateSubtask(sub *Subtask) (*Subtask, error)
 	DeleteSubtask(id string) (*Subtask, error)
 	ReorderSubtasks(taskID string, subIDs []string) error
+
+	AddWorkLogForTask(taskID string, hoursWorked float64, workDescription string, completionEstimate int) (*WorkLog, error)
+	AddWorkLogForSubtask(subtaskID string, hoursWorked float64, workDescription string, completionEstimate int) (*WorkLog, error)
+	GetWorkLogsForSubtask(subtaskID string) ([]*WorkLog, error)
+	GetWorkLogsForTask(taskID string) ([]*WorkLog, error)
+	GetWorkLogsForCategory(categoryID string) ([]*WorkLog, error)
 }

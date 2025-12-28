@@ -12,6 +12,7 @@ type SubtaskView struct {
 	Name         string
 	Description  string
 	Completion   int
+	WorkLogs     []WorkLogView
 	OOB          bool
 	DeleteButton DeleteButtonView
 }
@@ -23,6 +24,7 @@ func NewSubtaskView(s *domain.Subtask, oob bool) SubtaskView {
 		Name:        s.Name,
 		Description: s.Description,
 		Completion:  s.Completion,
+		WorkLogs:    NewWorkLogViewsFromSubtask(s),
 		OOB:         oob,
 		DeleteButton: DeleteButtonView{
 			URL:            "/subtasks/" + s.ID,

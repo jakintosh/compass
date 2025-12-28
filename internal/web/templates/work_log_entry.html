@@ -1,0 +1,15 @@
+{{define "work_log_entry"}}
+<div class="work-log-entry">
+    <div class="work-log-header">
+        <span class="work-log-date">{{.CreatedAt}}</span>
+        {{if .TaskName}}<span class="badge badge-task">{{.TaskName}}</span>{{end}}
+        {{if .SubtaskName}}<span class="badge badge-subtask">{{.SubtaskName}}</span>{{end}}
+    </div>
+    <div class="work-log-stats">
+        <span class="work-log-hours">{{.HoursWorked}}h</span>
+        <span class="work-log-arrow">→</span>
+        <span class="work-log-completion">{{.CompletionEstimate}}%</span>
+    </div>
+    <p class="work-log-description">{{.WorkDescription}}</p>
+</div>
+{{end}}

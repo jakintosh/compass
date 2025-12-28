@@ -23,6 +23,16 @@
                 hx-trigger="change" name="description" hx-swap="none"
                 onkeydown="if(event.key=='Enter') this.blur()">{{.Description}}</textarea>
         </form>
+
+        <div class="work-log-section">
+            <h3 class="section-title">All Work Logs</h3>
+            <div class="work-log-list">
+                {{range .WorkLogs}}
+                    {{template "work_log_entry" .}}
+                {{end}}
+            </div>
+        </div>
+
         {{template "delete_button" .DeleteButton}}
     </div>
 </div>

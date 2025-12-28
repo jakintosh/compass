@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"time"
 
 	"git.sr.ht/~jakintosh/todo/internal/domain"
 	"github.com/google/uuid"
@@ -86,6 +87,25 @@ func (s *SQLiteStore) migrate() error {
 			FOREIGN KEY(task_id) REFERENCES tasks(id) ON DELETE CASCADE,
 			FOREIGN KEY(category_id) REFERENCES categories(id) ON DELETE CASCADE
 		);
+
+		CREATE TABLE IF NOT EXISTS work_logs (
+			id TEXT PRIMARY KEY,
+			category_id TEXT NOT NULL,
+			task_id TEXT NOT NULL,
+			subtask_id TEXT,
+			hours_worked REAL NOT NULL,
+			work_description TEXT NOT NULL,
+			completion_estimate INTEGER NOT NULL,
+			created_at INTEGER NOT NULL,
+			FOREIGN KEY(category_id) REFERENCES categories(id) ON DELETE CASCADE,
+			FOREIGN KEY(task_id) REFERENCES tasks(id) ON DELETE CASCADE,
+			FOREIGN KEY(subtask_id) REFERENCES subtasks(id) ON DELETE CASCADE
+		);
+
+		CREATE INDEX IF NOT EXISTS idx_work_logs_category ON work_logs(category_id);
+		CREATE INDEX IF NOT EXISTS idx_work_logs_task ON work_logs(task_id);
+		CREATE INDEX IF NOT EXISTS idx_work_logs_subtask ON work_logs(subtask_id);
+		CREATE INDEX IF NOT EXISTS idx_work_logs_created_at ON work_logs(created_at DESC);
 	`)
 	return err
 }
@@ -230,7 +250,7 @@ func (s *SQLiteStore) GetCategory(id string) (*domain.Category, error) {
 			name,
 			description
 		FROM categories
-		WHERE id = ?`,
+		WHERE id = ?1`,
 		id,
 	)
 	if err := row.Scan(
@@ -259,7 +279,7 @@ func (s *SQLiteStore) getTasksForCategory(catID string) ([]*domain.Task, error) 
 			description,
 			completion
 		FROM tasks
-		WHERE category_id = ?
+		WHERE category_id = ?1
 		ORDER BY sort_order ASC`,
 		catID,
 	)
@@ -311,7 +331,7 @@ func (s *SQLiteStore) getSubtasksForTask(taskID string) ([]*domain.Subtask, erro
 			description,
 			completion
 		FROM subtasks
-		WHERE task_id = ?
+		WHERE task_id = ?1
 		ORDER BY sort_order ASC`,
 		taskID,
 	)
@@ -347,7 +367,7 @@ func (s *SQLiteStore) AddCategory(name string) (*domain.Category, error) {
 
 	_, err := s.db.Exec(`
 		INSERT INTO categories (id, name, sort_order)
-		VALUES (?, ?, ?)`,
+		VALUES (?1, ?2, ?3)`,
 		id,
 		name,
 		order,
@@ -367,9 +387,9 @@ func (s *SQLiteStore) UpdateCategory(cat *domain.Category) (*domain.Category, er
 	var updated domain.Category
 	if err := s.db.QueryRow(
 		`UPDATE categories
-			SET name = ?,
-				description = ?
-			WHERE id = ?
+			SET name = ?1,
+				description = ?2
+			WHERE id = ?3
 		RETURNING
 			id,
 			name,
@@ -392,7 +412,7 @@ func (s *SQLiteStore) DeleteCategory(id string) (*domain.Category, error) {
 	var removed domain.Category
 	if err := s.db.QueryRow(`
 		DELETE FROM categories
-		WHERE id = ?
+		WHERE id = ?1
 		RETURNING
 			id,
 			name,
@@ -418,8 +438,8 @@ func (s *SQLiteStore) ReorderCategories(ids []string) error {
 	for i, id := range ids {
 		if _, err := tx.Exec(`
 			UPDATE categories
-			SET sort_order = ?
-			WHERE id = ?`,
+			SET sort_order = ?1
+			WHERE id = ?2`,
 			i,
 			id,
 		); err != nil {
@@ -439,7 +459,7 @@ func (s *SQLiteStore) GetTask(id string) (*domain.Task, error) {
 			description,
 			completion
 		FROM tasks
-		WHERE id = ?`,
+		WHERE id = ?1`,
 		id,
 	).Scan(
 		&t.ID,
@@ -466,14 +486,14 @@ func (s *SQLiteStore) AddTask(catID string, name string) (*domain.Task, error) {
 	s.db.QueryRow(`
 		SELECT MAX(sort_order)
 		FROM tasks
-		WHERE category_id = ?`,
+		WHERE category_id = ?1`,
 		catID,
 	).Scan(&maxOrder)
 	order := int(maxOrder.Int64) + 1
 
 	if _, err := s.db.Exec(`
 		INSERT INTO tasks (id, category_id, name, sort_order)
-		VALUES (?, ?, ?, ?)`,
+		VALUES (?1, ?2, ?3, ?4)`,
 		id,
 		catID,
 		name,
@@ -493,10 +513,10 @@ func (s *SQLiteStore) UpdateTask(task *domain.Task) (*domain.Task, error) {
 	var updated domain.Task
 	if err := s.db.QueryRow(`
 		UPDATE tasks
-		SET name = ?,
-			description = ?,
-			completion = ?
-		WHERE id = ?
+		SET name = ?1,
+			description = ?2,
+			completion = ?3
+		WHERE id = ?4
 		RETURNING
 			id,
 			category_id,
@@ -524,7 +544,7 @@ func (s *SQLiteStore) DeleteTask(id string) (*domain.Task, error) {
 	var removed domain.Task
 	if err := s.db.QueryRow(`
 		DELETE FROM tasks
-		WHERE id = ?
+		WHERE id = ?1
 		RETURNING
 			id,
 			category_id,
@@ -557,8 +577,8 @@ func (s *SQLiteStore) ReorderTasks(catID string, taskIDs []string) error {
 	for i, id := range taskIDs {
 		if _, err := tx.Exec(`
 			UPDATE tasks
-			SET sort_order = ?
-			WHERE id = ? AND category_id = ?`,
+			SET sort_order = ?1
+			WHERE id = ?2 AND category_id = ?3`,
 			i,
 			id,
 			catID,
@@ -580,7 +600,7 @@ func (s *SQLiteStore) GetSubtask(id string) (*domain.Subtask, error) {
 			description,
 			completion
 		FROM subtasks
-		WHERE id = ?`,
+		WHERE id = ?1`,
 		id,
 	).Scan(
 		&sub.ID,
@@ -609,7 +629,7 @@ func (s *SQLiteStore) AddSubtask(taskID string, name string) (*domain.Subtask, e
 	if err := tx.QueryRow(`
 		SELECT MAX(sort_order)
 		FROM subtasks
-		WHERE task_id = ?`,
+		WHERE task_id = ?1`,
 		taskID,
 	).Scan(&maxOrder); err != nil {
 		return nil, err
@@ -619,9 +639,9 @@ func (s *SQLiteStore) AddSubtask(taskID string, name string) (*domain.Subtask, e
 	var sub domain.Subtask
 	if err := tx.QueryRow(`
 		INSERT INTO subtasks (id, task_id, category_id, name, sort_order)
-		SELECT ?, ?, category_id, ?, ?
+		SELECT ?1, ?2, category_id, ?3, ?4
 		FROM tasks
-		WHERE id = ?
+		WHERE id = ?2
 		RETURNING
 			id,
 			task_id,
@@ -633,7 +653,6 @@ func (s *SQLiteStore) AddSubtask(taskID string, name string) (*domain.Subtask, e
 		taskID,
 		name,
 		order,
-		taskID,
 	).Scan(
 		&sub.ID,
 		&sub.TaskID,
@@ -645,10 +664,6 @@ func (s *SQLiteStore) AddSubtask(taskID string, name string) (*domain.Subtask, e
 		return nil, err
 	}
 
-	if err := updateTaskCompletionTx(tx, sub.TaskID); err != nil {
-		return nil, err
-	}
-
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
@@ -657,19 +672,13 @@ func (s *SQLiteStore) AddSubtask(taskID string, name string) (*domain.Subtask, e
 }
 
 func (s *SQLiteStore) UpdateSubtask(sub *domain.Subtask) (*domain.Subtask, error) {
-	tx, err := s.db.Begin()
-	if err != nil {
-		return nil, err
-	}
-	defer tx.Rollback()
-
 	var updated domain.Subtask
-	if err := tx.QueryRow(`
+	if err := s.db.QueryRow(`
 		UPDATE subtasks
-		SET name = ?,
-			description = ?,
-			completion = ?
-		WHERE id = ?
+		SET name = ?1,
+			description = ?2,
+			completion = ?3
+		WHERE id = ?4
 		RETURNING
 			id,
 			task_id,
@@ -692,28 +701,14 @@ func (s *SQLiteStore) UpdateSubtask(sub *domain.Subtask) (*domain.Subtask, error
 		return nil, err
 	}
 
-	if err := updateTaskCompletionTx(tx, updated.TaskID); err != nil {
-		return nil, err
-	}
-
-	if err := tx.Commit(); err != nil {
-		return nil, err
-	}
-
 	return &updated, nil
 }
 
 func (s *SQLiteStore) DeleteSubtask(id string) (*domain.Subtask, error) {
-	tx, err := s.db.Begin()
-	if err != nil {
-		return nil, err
-	}
-	defer tx.Rollback()
-
 	var removed domain.Subtask
-	if err := tx.QueryRow(`
+	if err := s.db.QueryRow(`
 		DELETE FROM subtasks
-		WHERE id = ?
+		WHERE id = ?1
 		RETURNING
 			id,
 			task_id,
@@ -736,14 +731,6 @@ func (s *SQLiteStore) DeleteSubtask(id string) (*domain.Subtask, error) {
 		return nil, err
 	}
 
-	if err := updateTaskCompletionTx(tx, removed.TaskID); err != nil {
-		return nil, err
-	}
-
-	if err := tx.Commit(); err != nil {
-		return nil, err
-	}
-
 	return &removed, nil
 }
 
@@ -757,8 +744,8 @@ func (s *SQLiteStore) ReorderSubtasks(taskID string, subIDs []string) error {
 	for i, id := range subIDs {
 		if _, err := tx.Exec(`
 			UPDATE subtasks
-			SET sort_order = ?
-			WHERE id = ? AND task_id = ?`,
+			SET sort_order = ?1
+			WHERE id = ?2 AND task_id = ?3`,
 			i,
 			id,
 			taskID,
@@ -769,23 +756,257 @@ func (s *SQLiteStore) ReorderSubtasks(taskID string, subIDs []string) error {
 	return tx.Commit()
 }
 
-type taskCompletionExecutor interface {
-	Exec(query string, args ...any) (sql.Result, error)
+func (s *SQLiteStore) AddWorkLogForTask(taskID string, hoursWorked float64, workDescription string, completionEstimate int) (*domain.WorkLog, error) {
+	id := uuid.NewString()
+	now := time.Now()
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	var wl domain.WorkLog
+	var createdAtUnix int64
+	var subtaskIDNull sql.NullString
+
+	if err := tx.QueryRow(`
+		INSERT INTO work_logs (
+			id,
+			category_id,
+			task_id,
+			subtask_id,
+			hours_worked,
+			work_description,
+			completion_estimate,
+			created_at)
+		SELECT
+			?1,
+			category_id,
+			?2,
+			NULL,
+			?3,
+			?4,
+			?5,
+			?6
+		FROM tasks
+		WHERE id = ?2
+		RETURNING
+			id,
+			category_id,
+			task_id,
+			subtask_id,
+			hours_worked,
+			work_description,
+			completion_estimate,
+			created_at`,
+		id,
+		taskID,
+		hoursWorked,
+		workDescription,
+		completionEstimate,
+		now.Unix(),
+	).Scan(
+		&wl.ID,
+		&wl.CategoryID,
+		&wl.TaskID,
+		&subtaskIDNull,
+		&wl.HoursWorked,
+		&wl.WorkDescription,
+		&wl.CompletionEstimate,
+		&createdAtUnix,
+	); err != nil {
+		return nil, err
+	}
+
+	wl.SubtaskID = subtaskIDNull.String
+	wl.CreatedAt = time.Unix(createdAtUnix, 0)
+
+	if _, err := tx.Exec(`
+		UPDATE tasks
+		SET completion = ?1
+		WHERE id = ?2`,
+		completionEstimate,
+		taskID,
+	); err != nil {
+		return nil, err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+
+	return &wl, nil
 }
 
-func updateTaskCompletionTx(exec taskCompletionExecutor, taskID string) error {
-	_, err := exec.Exec(`
-		UPDATE tasks
-		SET completion = COALESCE(
-			(
-				SELECT CAST(AVG(completion) AS INTEGER)
-				FROM subtasks
-				WHERE task_id = ?
-			),
-			0)
-		WHERE id = ?`,
-		taskID,
-		taskID,
-	)
-	return err
+func (s *SQLiteStore) AddWorkLogForSubtask(subtaskID string, hoursWorked float64, workDescription string, completionEstimate int) (*domain.WorkLog, error) {
+	id := uuid.NewString()
+	now := time.Now()
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	var wl domain.WorkLog
+	var createdAtUnix int64
+	var subtaskIDNull sql.NullString
+
+	if err := tx.QueryRow(`
+		INSERT INTO work_logs (
+			id,
+			category_id,
+			task_id,
+			subtask_id,
+			hours_worked,
+			work_description,
+			completion_estimate,
+			created_at
+		)
+		SELECT
+			?1,
+			category_id,
+			task_id,
+			?2,
+			?3,
+			?4,
+			?5,
+			?6
+		FROM subtasks
+		WHERE id = ?2
+		RETURNING
+			id,
+			category_id,
+			task_id,
+			subtask_id,
+			hours_worked,
+			work_description,
+			completion_estimate,
+			created_at`,
+		id,
+		subtaskID,
+		hoursWorked,
+		workDescription,
+		completionEstimate,
+		now.Unix(),
+	).Scan(
+		&wl.ID,
+		&wl.CategoryID,
+		&wl.TaskID,
+		&subtaskIDNull,
+		&wl.HoursWorked,
+		&wl.WorkDescription,
+		&wl.CompletionEstimate,
+		&createdAtUnix,
+	); err != nil {
+		return nil, err
+	}
+
+	wl.SubtaskID = subtaskIDNull.String
+	wl.CreatedAt = time.Unix(createdAtUnix, 0)
+
+	if _, err := tx.Exec(`
+		UPDATE subtasks
+		SET completion = ?1
+		WHERE id = ?2`,
+		completionEstimate,
+		subtaskID,
+	); err != nil {
+		return nil, err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+
+	return &wl, nil
+}
+
+func (s *SQLiteStore) scanWorkLogs(rows *sql.Rows) ([]*domain.WorkLog, error) {
+	defer rows.Close()
+	var logs []*domain.WorkLog
+	for rows.Next() {
+		var wl domain.WorkLog
+		var createdAt int64
+		var subtaskID sql.NullString
+		if err := rows.Scan(
+			&wl.ID,
+			&wl.CategoryID,
+			&wl.TaskID,
+			&subtaskID,
+			&wl.HoursWorked,
+			&wl.WorkDescription,
+			&wl.CompletionEstimate,
+			&createdAt,
+		); err != nil {
+			return nil, err
+		}
+		wl.SubtaskID = subtaskID.String
+		wl.CreatedAt = time.Unix(createdAt, 0)
+		logs = append(logs, &wl)
+	}
+	return logs, rows.Err()
+}
+
+func (s *SQLiteStore) GetWorkLogsForSubtask(subtaskID string) ([]*domain.WorkLog, error) {
+	rows, err := s.db.Query(`
+		SELECT
+			id,
+			category_id,
+			task_id,
+			subtask_id,
+			hours_worked,
+			work_description,
+			completion_estimate,
+			created_at
+		FROM work_logs
+		WHERE subtask_id = ?1
+		ORDER BY created_at DESC`, subtaskID)
+	if err != nil {
+		return nil, err
+	}
+	return s.scanWorkLogs(rows)
+}
+
+func (s *SQLiteStore) GetWorkLogsForTask(taskID string) ([]*domain.WorkLog, error) {
+	rows, err := s.db.Query(`
+		SELECT
+			id,
+			category_id,
+			task_id,
+			subtask_id,
+			hours_worked,
+			work_description,
+			completion_estimate,
+			created_at
+		FROM work_logs
+		WHERE task_id = ?1
+		ORDER BY created_at DESC`,
+		taskID)
+	if err != nil {
+		return nil, err
+	}
+	return s.scanWorkLogs(rows)
+}
+
+func (s *SQLiteStore) GetWorkLogsForCategory(categoryID string) ([]*domain.WorkLog, error) {
+	rows, err := s.db.Query(`
+		SELECT
+			id,
+			category_id,
+			task_id,
+			subtask_id,
+			hours_worked,
+			work_description,
+			completion_estimate,
+			created_at
+		FROM work_logs
+		WHERE category_id = ?1
+		ORDER BY created_at DESC`,
+		categoryID)
+	if err != nil {
+		return nil, err
+	}
+	return s.scanWorkLogs(rows)
 }

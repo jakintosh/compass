@@ -13,6 +13,7 @@ type CategoryView struct {
 	Description       string
 	AverageCompletion int
 	Tasks             []TaskView
+	WorkLogs          []WorkLogView
 	OOB               bool
 	DeleteButton      DeleteButtonView
 }
@@ -25,6 +26,7 @@ func NewCategoryView(c *domain.Category, oob bool) CategoryView {
 		Description:       c.Description,
 		AverageCompletion: c.AverageCompletion(),
 		OOB:               oob,
+		WorkLogs:          NewWorkLogViewsFromCategory(c),
 	}
 	if len(c.Tasks) > 0 {
 		view.Tasks = make([]TaskView, len(c.Tasks))

@@ -43,13 +43,7 @@
 
         <span class="item-spacer"></span>
 
-        {{if .HasSubtasks}}
         <div class="progress-bar">{{template "task_progress_fill" .}}</div>
-        {{else}}
-        <div class="item-slider">
-            <input type="range" min="0" max="100" value="{{.Completion}}" class="range-slider" name="completion" hx-patch="/tasks/{{.ID}}" hx-trigger="change" hx-swap="none" hx-sync="this:replace"/>
-        </div>
-        {{end}}
 
         {{template "task_percent" .}}
 

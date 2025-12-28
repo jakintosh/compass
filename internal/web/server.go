@@ -57,6 +57,10 @@ func (s *Server) routes() {
 	s.router.HandleFunc("DELETE /categories/{id}", s.handleDeleteCategory)
 	s.router.HandleFunc("DELETE /tasks/{id}", s.handleDeleteTask)
 	s.router.HandleFunc("DELETE /subtasks/{id}", s.handleDeleteSubtask)
+
+	// Work Log Routes
+	s.router.HandleFunc("POST /tasks/{id}/work-logs", s.handleCreateTaskWorkLog)
+	s.router.HandleFunc("POST /subtasks/{id}/work-logs", s.handleCreateSubtaskWorkLog)
 }
 
 func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
@@ -143,6 +147,14 @@ func (s *Server) handleGetCategoryDetails(w http.ResponseWriter, r *http.Request
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
+
+	// Fetch work logs for category
+	workLogs, err := s.store.GetWorkLogsForCategory(id)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	cat.WorkLogs = workLogs
 
 	if ctx.IsHTMX {
 		if err := s.presentation.RenderCategoryDetails(w, NewCategoryView(cat, false)); err != nil {
@@ -264,6 +276,14 @@ func (s *Server) handleGetSubtaskDetails(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	// Fetch work logs for subtask
+	workLogs, err := s.store.GetWorkLogsForSubtask(id)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	sub.WorkLogs = workLogs
+
 	if ctx.IsHTMX {
 		if err := s.presentation.RenderSubtaskDetails(w, NewSubtaskView(sub, false)); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -297,6 +317,14 @@ func (s *Server) handleGetTaskDetails(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
+
+	// Fetch work logs for task
+	workLogs, err := s.store.GetWorkLogsForTask(id)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	task.WorkLogs = workLogs
 
 	if ctx.IsHTMX {
 		if err := s.presentation.RenderTaskDetails(w, NewTaskView(task, false)); err != nil {
@@ -567,4 +595,100 @@ func (s *Server) handleDeleteSubtask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Write(buf.Bytes())
+}
+
+func (s *Server) handleCreateTaskWorkLog(w http.ResponseWriter, r *http.Request) {
+	ctx := parseRequestContext(r)
+	taskID := r.PathValue("id")
+
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Invalid form data", http.StatusBadRequest)
+		return
+	}
+
+	hoursWorked, err := strconv.ParseFloat(r.FormValue("hours_worked"), 64)
+	if err != nil {
+		http.Error(w, "Invalid hours_worked value", http.StatusBadRequest)
+		return
+	}
+
+	completionEstimate, err := strconv.Atoi(r.FormValue("completion_estimate"))
+	if err != nil {
+		http.Error(w, "Invalid completion_estimate value", http.StatusBadRequest)
+		return
+	}
+
+	workDescription := r.FormValue("work_description")
+
+	workLog, err := s.store.AddWorkLogForTask(taskID, hoursWorked, workDescription, completionEstimate)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if !ctx.IsHTMX {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+
+	// Re-fetch category and render as OOB
+	cat, err := s.store.GetCategory(workLog.CategoryID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	catView := NewCategoryView(cat, true)
+	if err := s.presentation.RenderCategoryOOB(w, catView); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+}
+
+func (s *Server) handleCreateSubtaskWorkLog(w http.ResponseWriter, r *http.Request) {
+	ctx := parseRequestContext(r)
+	subtaskID := r.PathValue("id")
+
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Invalid form data", http.StatusBadRequest)
+		return
+	}
+
+	hoursWorked, err := strconv.ParseFloat(r.FormValue("hours_worked"), 64)
+	if err != nil {
+		http.Error(w, "Invalid hours_worked value", http.StatusBadRequest)
+		return
+	}
+
+	completionEstimate, err := strconv.Atoi(r.FormValue("completion_estimate"))
+	if err != nil {
+		http.Error(w, "Invalid completion_estimate value", http.StatusBadRequest)
+		return
+	}
+
+	workDescription := r.FormValue("work_description")
+
+	workLog, err := s.store.AddWorkLogForSubtask(subtaskID, hoursWorked, workDescription, completionEstimate)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if !ctx.IsHTMX {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+
+	// Re-fetch category and render as OOB
+	cat, err := s.store.GetCategory(workLog.CategoryID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	catView := NewCategoryView(cat, true)
+	if err := s.presentation.RenderCategoryOOB(w, catView); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 }

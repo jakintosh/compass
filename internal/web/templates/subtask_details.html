@@ -23,6 +23,37 @@
                 hx-trigger="change" name="description" hx-swap="none"
                 onkeydown="if(event.key=='Enter') this.blur()">{{.Description}}</textarea>
         </form>
+
+        <div class="work-log-section">
+            <h3 class="section-title">Work Log</h3>
+
+            <form class="work-log-form" hx-post="/subtasks/{{.ID}}/work-logs" hx-swap="none" hx-on::after-request="this.reset()">
+                <div class="form-row-inline">
+                    <div class="form-field-compact">
+                        <label class="field-label">Completion</label>
+                        <div class="slider-compact">
+                            <input type="range" min="0" max="100" value="{{.Completion}}" name="completion_estimate" class="range-slider range-slider-compact" oninput="this.nextElementSibling.textContent = this.value + '%'">
+                            <span class="percent-display-compact">{{.Completion}}%</span>
+                        </div>
+                    </div>
+                    <div class="form-field-compact">
+                        <label class="field-label">Hours</label>
+                        <input type="number" step="0.5" min="0" name="hours_worked" class="input-box field-input-compact" placeholder="0" required>
+                    </div>
+                </div>
+                <div class="form-row-inline">
+                    <input type="text" name="work_description" class="input-box field-input-description" placeholder="What did you work on?" required>
+                    <button type="submit" class="btn-log">Log</button>
+                </div>
+            </form>
+
+            <div class="work-log-list">
+                {{range .WorkLogs}}
+                    {{template "work_log_entry" .}}
+                {{end}}
+            </div>
+        </div>
+
         {{template "delete_button" .DeleteButton}}
     </div>
 </div>

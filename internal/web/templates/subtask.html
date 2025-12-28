@@ -6,6 +6,10 @@
 <span id="subtask-percent-{{.ID}}" class="item-percent" {{if .OOB}} hx-swap-oob="true" {{end}} >{{.Completion}}%</span>
 {{end}}
 
+{{define "subtask_progress_fill"}}
+<div id="subtask-progress-fill-{{.ID}}" class="progress-fill" style="width: {{.Completion}}%" {{if .OOB}}hx-swap-oob="true"{{end}}></div>
+{{end}}
+
 <li class="row subtask" id="subtask-{{.ID}}" data-id="{{.ID}}" {{if .OOB}} hx-swap-oob="true" {{end}}>
     <!-- Drag handle -->
     <div class="drag-handle hover-reveal">
@@ -23,9 +27,7 @@
 
     <span class="item-spacer"></span>
 
-    <div class="item-slider">
-        <input type="range" min="0" max="100" value="{{.Completion}}" class="range-slider" name="completion" hx-patch="/subtasks/{{.ID}}" hx-trigger="change" hx-swap="none" hx-sync="this:replace"/>
-    </div>
+    <div class="progress-bar">{{template "subtask_progress_fill" .}}</div>
 
     {{template "subtask_percent" .}}
 
