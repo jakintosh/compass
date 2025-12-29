@@ -94,7 +94,13 @@ func (s *Server) handleCreateCategory(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := s.presentation.RenderCategory(w, NewCategoryView(cat, false)); err != nil {
+	catView := NewCategoryView(cat, false)
+	if err := s.presentation.RenderCategory(w, catView); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if err := s.presentation.RenderSlideoverWithDetails(w, catView); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
@@ -184,7 +190,7 @@ func (s *Server) handleCreateTask(w http.ResponseWriter, r *http.Request) {
 	ctx := parseRequestContext(r)
 	catID := r.PathValue("id")
 
-	_, err := s.store.AddTask(catID, "New Task")
+	task, err := s.store.AddTask(catID, "New Task")
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -209,6 +215,10 @@ func (s *Server) handleCreateTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Write(buf.Bytes())
+
+	if err := s.presentation.RenderSlideoverWithDetails(w, NewTaskView(task, false)); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }
 
 func (s *Server) handleUpdateTask(w http.ResponseWriter, r *http.Request) {
@@ -379,6 +389,10 @@ func (s *Server) handleCreateSubtask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Write(buf.Bytes())
+
+	if err := s.presentation.RenderSlideoverWithDetails(w, NewSubtaskView(sub, false)); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }
 
 func (s *Server) handleUpdateSubtask(w http.ResponseWriter, r *http.Request) {
