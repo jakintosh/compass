@@ -152,6 +152,47 @@ body {
     color: var(--color-text);
 }
 
+/* Row content - clickable area for details */
+.row-content {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    flex: 1;
+    min-width: 0;
+    cursor: pointer;
+}
+
+.row-content:hover .item-name,
+.row-content:hover .category-name {
+    text-decoration: underline;
+    text-decoration-color: var(--color-text-muted);
+    text-underline-offset: 2px;
+}
+
+/* Suppress content hover when drag handle is hovered */
+.row:has(.drag-handle:hover) .row-content:hover .item-name,
+.row:has(.drag-handle:hover) .row-content:hover .category-name {
+    text-decoration: none;
+}
+
+.row-content-arrow {
+    color: var(--color-text);
+    flex-shrink: 0;
+    margin-left: var(--space-sm);
+    opacity: 0;
+    transition: opacity var(--transition-fast);
+}
+
+.row:hover .row-content-arrow {
+    opacity: 1;
+}
+
+/* Hide arrow when drag handle or expand toggle is hovered */
+.row:has(.drag-handle:hover) .row-content-arrow,
+.row:has(.expand-toggle-btn:hover) .row-content-arrow {
+    opacity: 0;
+}
+
 /* ==========================================
    Base Components - Buttons
    ========================================== */
@@ -185,28 +226,6 @@ body {
 
 .btn-add:hover .arrow {
     transform: translateX(4px);
-}
-
-.btn-edit-icon {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 50%;
-    border: 1px solid var(--color-border);
-    background: transparent;
-    color: var(--color-text-muted);
-    transition: var(--transition-fast);
-    cursor: pointer;
-    margin: auto;
-    flex-shrink: 0;
-    flex-basis: 32px;
-    aspect-ratio: 1;
-}
-
-.btn-edit-icon:hover {
-    background-color: var(--color-surface);
-    border-color: var(--color-text-muted);
-    color: var(--color-text);
 }
 
 .btn-danger {
