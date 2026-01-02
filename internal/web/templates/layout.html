@@ -6,24 +6,27 @@
 
 <!doctype html>
 <html lang="en">
-    <head>
-        <meta charset="UTF-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>In Progress</title>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-        <link rel="stylesheet" href="/static/css/style.css" />
-        <script>
-          {{template "observer.js" .}}
-        </script>
-        <script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.8/dist/htmx.min.js" integrity="sha384-/TgkGk7p307TH7EXJDuUlgG3Ce1UVolAOFopFekQkkXihi5u/6OCvVKyz1W+idaz" crossorigin="anonymous"></script>
-        <script defer src="https://unpkg.com/hyperscript.org@0.9.14"></script>
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
-    </head>
 
-    <body>
-        {{template "content" .}} {{template "slideover_container" .}}
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>In Progress</title>{{if .CSRFToken}}
+    <meta name="csrf-token" content="{{.CSRFToken}}">{{end}}
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="/static/css/style.css" />
+    <script>
+        { {template "observer.js".} }
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.8/dist/htmx.min.js" integrity="sha384-/TgkGk7p307TH7EXJDuUlgG3Ce1UVolAOFopFekQkkXihi5u/6OCvVKyz1W+idaz" crossorigin="anonymous"></script>
+    <script defer src="https://unpkg.com/hyperscript.org@0.9.14"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
+</head>
 
-        <script src="/static/js/app.js"></script>
-    </body>
+<body>
+    {{template "content" .}} {{template "slideover_container" .}}
+
+    <script src="/static/js/app.js"></script>
+</body>
+
 </html>

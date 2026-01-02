@@ -14,7 +14,7 @@ test: build
 # Run the application
 run: build
 	@echo "Running todo..."
-	@./bin/todo
+	@./bin/todo --dev
 
 # Clean build artifacts
 clean:

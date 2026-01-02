@@ -29,7 +29,7 @@ func NewSubtaskView(s *domain.Subtask, oob bool, auth AuthContext) SubtaskView {
 		WorkLogs:    NewWorkLogViewsFromSubtask(s),
 		OOB:         oob,
 		DeleteButton: DeleteButtonView{
-			URL:            "/subtasks/" + s.ID,
+			URL:            "/subtasks/" + s.ID + "?csrf=" + auth.CSRFToken,
 			ConfirmMessage: "Delete this subtask?",
 			ButtonText:     "Delete Subtask",
 		},

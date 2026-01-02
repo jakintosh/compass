@@ -15,20 +15,18 @@
         {{if .IsAuthenticated}}
         <form class="form-field">
             <label class="field-label">Name</label>
-            <input type="text" value="{{.Name}}" class="field-input" hx-patch="/subtasks/{{.ID}}" hx-trigger="change"
-                name="name" hx-swap="none" onkeydown="if(event.key=='Enter') this.blur()">
+            <input type="text" value="{{.Name}}" class="field-input" hx-patch="/subtasks/{{.ID}}?csrf={{.CSRFToken}}" hx-trigger="change" name="name" hx-swap="none" onkeydown="if(event.key=='Enter') this.blur()">
         </form>
         <form class="form-field">
             <label class="field-label">Description</label>
-            <textarea rows="3" class="field-textarea" placeholder="Add a description..." hx-patch="/subtasks/{{.ID}}"
-                hx-trigger="change" name="description" hx-swap="none"
+            <textarea rows="3" class="field-textarea" placeholder="Add a description..." hx-patch="/subtasks/{{.ID}}?csrf={{.CSRFToken}}" hx-trigger="change" name="description" hx-swap="none"
                 onkeydown="if(event.key=='Enter') this.blur()">{{.Description}}</textarea>
         </form>
 
         <div class="work-log-section">
             <h3 class="section-title">Work Log</h3>
 
-            <form class="work-log-form" hx-post="/subtasks/{{.ID}}/work-logs" hx-swap="none" hx-on::after-request="this.reset()">
+            <form class="work-log-form" hx-post="/subtasks/{{.ID}}/work-logs?csrf={{.CSRFToken}}" hx-swap="none" hx-on::after-request="this.reset()">
                 <div class="form-row-inline">
                     <div class="form-field-compact">
                         <label class="field-label">Completion</label>

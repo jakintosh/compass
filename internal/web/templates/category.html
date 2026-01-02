@@ -11,7 +11,7 @@
         {{if .IsAuthenticated}}
         <!-- Drag handle -->
         <div class="drag-handle hover-reveal">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <circle cx="9" cy="12" r="1" />
                 <circle cx="9" cy="5" r="1" />
                 <circle cx="9" cy="19" r="1" />
@@ -28,8 +28,7 @@
                     set container to closest <li/>
                     toggle .collapsed on container
                     localStorage.setItem(container@data-ui-key, container matches .collapsed)
-            "
-        >
+            ">
             <svg class="expand-toggle-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <polyline points="6 9 12 15 18 9"></polyline>
             </svg>
@@ -52,7 +51,7 @@
 
         {{if .IsAuthenticated}}
         <li class="row add-item">
-            <button class="btn btn-add" hx-post="/categories/{{.ID}}/tasks" hx-target="closest li" hx-swap="beforebegin">
+            <button class="btn btn-add" hx-post="/categories/{{.ID}}/tasks?csrf={{.CSRFToken}}" hx-target="closest li" hx-swap="beforebegin">
                 <span class="arrow">→</span>
                 <span>Add a task</span>
             </button>

@@ -2,26 +2,48 @@ package web
 
 import (
 	"bytes"
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
 
+	"git.sr.ht/~jakintosh/consent/pkg/client"
 	"git.sr.ht/~jakintosh/todo/internal/domain"
 )
 
+// AuthConfig configures authentication for the server.
+// When nil is passed to ServerOptions, the server runs without auth capability.
+type AuthConfig struct {
+	// Verifier validates access tokens
+	Verifier client.Verifier
+
+	// LoginURL is where the login button should send users
+	LoginURL string
+
+	// LogoutURL is where the logout button should send users
+	LogoutURL string
+
+	// Routes are mode-specific handlers to register (e.g., /dev/login, /auth/callback)
+	Routes map[string]http.HandlerFunc
+}
+
 // ServerOptions configures the web server
 type ServerOptions struct {
-	PublicMode bool // When true, renders read-only UI for unauthenticated users
+	Auth AuthConfig // Required; Verifier must be non-nil
 }
 
 type Server struct {
 	store        domain.Store
 	router       *http.ServeMux
 	presentation *Presentation
-	auth         AuthContext
+	auth         AuthConfig
 }
 
 func NewServer(store domain.Store, opts ServerOptions) (*Server, error) {
+	if opts.Auth.Verifier == nil {
+		return nil, errors.New("Auth.Verifier is required")
+	}
+
 	pres, err := NewPresentation()
 	if err != nil {
 		return nil, err
@@ -30,9 +52,7 @@ func NewServer(store domain.Store, opts ServerOptions) (*Server, error) {
 		store:        store,
 		router:       http.NewServeMux(),
 		presentation: pres,
-		auth: AuthContext{
-			IsAuthenticated: !opts.PublicMode,
-		},
+		auth:         opts.Auth,
 	}
 	s.routes()
 	return s, nil
@@ -46,6 +66,11 @@ func (s *Server) routes() {
 	// Static Files
 	fs := http.FileServer(http.Dir("internal/web/static"))
 	s.router.Handle("/static/", http.StripPrefix("/static/", fs))
+
+	// Auth routes (mode-specific: /dev/login, /dev/logout, /auth/callback, etc.)
+	for path, handler := range s.auth.Routes {
+		s.router.HandleFunc(path, handler)
+	}
 
 	// Page Routes
 	s.router.HandleFunc("GET /{$}", s.handleIndex)
@@ -72,7 +97,58 @@ func (s *Server) routes() {
 	s.router.HandleFunc("POST /subtasks/{id}/work-logs", s.handleCreateSubtaskWorkLog)
 }
 
+// getAuthContext attempts to verify auth and returns context with CSRF token.
+// Returns unauthenticated context if verification fails.
+func (s *Server) getAuthContext(w http.ResponseWriter, r *http.Request) AuthContext {
+	// Build base context with auth URLs
+	ctx := AuthContext{
+		IsAuthenticated: false,
+		LoginURL:        s.auth.LoginURL,
+		LogoutURL:       s.auth.LogoutURL,
+	}
+
+	accessToken, csrfToken, err := s.auth.Verifier.VerifyAuthorizationGetCSRF(w, r)
+	if err != nil {
+		return ctx
+	}
+
+	ctx.IsAuthenticated = true
+	ctx.Handle = accessToken.Subject()
+	ctx.CSRFToken = csrfToken
+	return ctx
+}
+
+// requireAuth verifies auth and CSRF for destructive operations.
+// Returns auth context and true if authorized, writes error response if not.
+func (s *Server) requireAuth(w http.ResponseWriter, r *http.Request) (AuthContext, bool) {
+	// Get CSRF from request (form value or query param)
+	csrf := r.FormValue("csrf")
+	if csrf == "" {
+		csrf = r.URL.Query().Get("csrf")
+	}
+
+	accessToken, csrfToken, err := s.auth.Verifier.VerifyAuthorizationCheckCSRF(w, r, csrf)
+	if err == client.ErrCSRFInvalid {
+		http.Error(w, "CSRF validation failed", http.StatusForbidden)
+		return AuthContext{}, false
+	}
+	if err != nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return AuthContext{}, false
+	}
+
+	return AuthContext{
+		IsAuthenticated: true,
+		Handle:          accessToken.Subject(),
+		CSRFToken:       csrfToken,
+		LoginURL:        s.auth.LoginURL,
+		LogoutURL:       s.auth.LogoutURL,
+	}, true
+}
+
 func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
+	auth := s.getAuthContext(w, r)
+
 	cats, err := s.store.GetCategories()
 	if err != nil {
 		http.Error(w, "Failed to load categories", http.StatusInternalServerError)
@@ -82,15 +158,20 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 	// Convert to view models
 	catViews := make([]CategoryView, len(cats))
 	for i, c := range cats {
-		catViews[i] = NewCategoryView(c, false, s.auth)
+		catViews[i] = NewCategoryView(c, false, auth)
 	}
 
-	if err := s.presentation.RenderIndex(w, catViews); err != nil {
+	if err := s.presentation.RenderIndex(w, catViews, auth); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
 
 func (s *Server) handleCreateCategory(w http.ResponseWriter, r *http.Request) {
+	auth, ok := s.requireAuth(w, r)
+	if !ok {
+		return
+	}
+
 	ctx := parseRequestContext(r)
 	cat, err := s.store.AddCategory("New Category")
 	if err != nil {
@@ -103,7 +184,7 @@ func (s *Server) handleCreateCategory(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	catView := NewCategoryView(cat, false, s.auth)
+	catView := NewCategoryView(cat, false, auth)
 	if err := s.presentation.RenderCategory(w, catView); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -115,6 +196,11 @@ func (s *Server) handleCreateCategory(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleUpdateCategory(w http.ResponseWriter, r *http.Request) {
+	auth, ok := s.requireAuth(w, r)
+	if !ok {
+		return
+	}
+
 	ctx := parseRequestContext(r)
 	id := r.PathValue("id")
 	cat, err := s.store.GetCategory(id)
@@ -147,13 +233,14 @@ func (s *Server) handleUpdateCategory(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Render OOB updates for category name (in header)
-	catView := NewCategoryView(cat, true, s.auth)
+	catView := NewCategoryView(cat, true, auth)
 	if err := s.presentation.RenderCategory(w, catView); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
 
 func (s *Server) handleGetCategoryDetails(w http.ResponseWriter, r *http.Request) {
+	auth := s.getAuthContext(w, r)
 	ctx := parseRequestContext(r)
 	id := r.PathValue("id")
 
@@ -172,7 +259,7 @@ func (s *Server) handleGetCategoryDetails(w http.ResponseWriter, r *http.Request
 	cat.WorkLogs = workLogs
 
 	if ctx.IsHTMX {
-		if err := s.presentation.RenderCategoryDetails(w, NewCategoryView(cat, false, s.auth)); err != nil {
+		if err := s.presentation.RenderCategoryDetails(w, NewCategoryView(cat, false, auth)); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 		return
@@ -187,15 +274,20 @@ func (s *Server) handleGetCategoryDetails(w http.ResponseWriter, r *http.Request
 
 	catViews := make([]CategoryView, len(cats))
 	for i, c := range cats {
-		catViews[i] = NewCategoryView(c, false, s.auth)
+		catViews[i] = NewCategoryView(c, false, auth)
 	}
 
-	if err := s.presentation.RenderIndexWithDetails(w, catViews, NewCategoryView(cat, false, s.auth)); err != nil {
+	if err := s.presentation.RenderIndexWithDetails(w, catViews, auth, NewCategoryView(cat, false, auth)); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
 
 func (s *Server) handleCreateTask(w http.ResponseWriter, r *http.Request) {
+	auth, ok := s.requireAuth(w, r)
+	if !ok {
+		return
+	}
+
 	ctx := parseRequestContext(r)
 	catID := r.PathValue("id")
 
@@ -217,7 +309,7 @@ func (s *Server) handleCreateTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	catView := NewCategoryView(cat, true, s.auth)
+	catView := NewCategoryView(cat, true, auth)
 	var buf bytes.Buffer
 	if err := s.presentation.RenderCategoryOOB(&buf, catView); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -225,13 +317,18 @@ func (s *Server) handleCreateTask(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Write(buf.Bytes())
 
-	taskView := NewTaskView(task, false, s.auth)
+	taskView := NewTaskView(task, false, auth)
 	if err := s.presentation.RenderSlideoverWithDetails(w, taskView); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
 
 func (s *Server) handleUpdateTask(w http.ResponseWriter, r *http.Request) {
+	auth, ok := s.requireAuth(w, r)
+	if !ok {
+		return
+	}
+
 	ctx := parseRequestContext(r)
 	id := r.PathValue("id")
 
@@ -277,7 +374,7 @@ func (s *Server) handleUpdateTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	catView := NewCategoryView(cat, true, s.auth)
+	catView := NewCategoryView(cat, true, auth)
 	var buf bytes.Buffer
 	if err := s.presentation.RenderCategoryOOB(&buf, catView); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -287,6 +384,7 @@ func (s *Server) handleUpdateTask(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleGetSubtaskDetails(w http.ResponseWriter, r *http.Request) {
+	auth := s.getAuthContext(w, r)
 	ctx := parseRequestContext(r)
 	id := r.PathValue("id")
 
@@ -303,7 +401,7 @@ func (s *Server) handleGetSubtaskDetails(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	sub.WorkLogs = workLogs
-	subtaskView := NewSubtaskView(sub, false, s.auth)
+	subtaskView := NewSubtaskView(sub, false, auth)
 
 	if ctx.IsHTMX {
 		if err := s.presentation.RenderSubtaskDetails(w, subtaskView); err != nil {
@@ -321,15 +419,16 @@ func (s *Server) handleGetSubtaskDetails(w http.ResponseWriter, r *http.Request)
 
 	catViews := make([]CategoryView, len(cats))
 	for i, c := range cats {
-		catViews[i] = NewCategoryView(c, false, s.auth)
+		catViews[i] = NewCategoryView(c, false, auth)
 	}
 
-	if err := s.presentation.RenderIndexWithDetails(w, catViews, subtaskView); err != nil {
+	if err := s.presentation.RenderIndexWithDetails(w, catViews, auth, subtaskView); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
 
 func (s *Server) handleGetTaskDetails(w http.ResponseWriter, r *http.Request) {
+	auth := s.getAuthContext(w, r)
 	ctx := parseRequestContext(r)
 	id := r.PathValue("id")
 
@@ -346,7 +445,7 @@ func (s *Server) handleGetTaskDetails(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	task.WorkLogs = workLogs
-	taskView := NewTaskView(task, false, s.auth)
+	taskView := NewTaskView(task, false, auth)
 
 	if ctx.IsHTMX {
 		if err := s.presentation.RenderTaskDetails(w, taskView); err != nil {
@@ -364,15 +463,20 @@ func (s *Server) handleGetTaskDetails(w http.ResponseWriter, r *http.Request) {
 
 	catViews := make([]CategoryView, len(cats))
 	for i, c := range cats {
-		catViews[i] = NewCategoryView(c, false, s.auth)
+		catViews[i] = NewCategoryView(c, false, auth)
 	}
 
-	if err := s.presentation.RenderIndexWithDetails(w, catViews, taskView); err != nil {
+	if err := s.presentation.RenderIndexWithDetails(w, catViews, auth, taskView); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
 
 func (s *Server) handleCreateSubtask(w http.ResponseWriter, r *http.Request) {
+	auth, ok := s.requireAuth(w, r)
+	if !ok {
+		return
+	}
+
 	ctx := parseRequestContext(r)
 	taskID := r.PathValue("id")
 
@@ -394,7 +498,7 @@ func (s *Server) handleCreateSubtask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	catView := NewCategoryView(cat, true, s.auth)
+	catView := NewCategoryView(cat, true, auth)
 	var buf bytes.Buffer
 	if err := s.presentation.RenderCategoryOOB(&buf, catView); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -402,13 +506,18 @@ func (s *Server) handleCreateSubtask(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Write(buf.Bytes())
 
-	subtaskView := NewSubtaskView(sub, false, s.auth)
+	subtaskView := NewSubtaskView(sub, false, auth)
 	if err := s.presentation.RenderSlideoverWithDetails(w, subtaskView); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
 
 func (s *Server) handleUpdateSubtask(w http.ResponseWriter, r *http.Request) {
+	auth, ok := s.requireAuth(w, r)
+	if !ok {
+		return
+	}
+
 	ctx := parseRequestContext(r)
 	id := r.PathValue("id")
 	sub, err := s.store.GetSubtask(id)
@@ -453,7 +562,7 @@ func (s *Server) handleUpdateSubtask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	catView := NewCategoryView(cat, true, s.auth)
+	catView := NewCategoryView(cat, true, auth)
 	var buf bytes.Buffer
 	if err := s.presentation.RenderCategoryOOB(&buf, catView); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -463,6 +572,10 @@ func (s *Server) handleUpdateSubtask(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleReorderCategories(w http.ResponseWriter, r *http.Request) {
+	if _, ok := s.requireAuth(w, r); !ok {
+		return
+	}
+
 	ctx := parseRequestContext(r)
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -487,6 +600,10 @@ func (s *Server) handleReorderCategories(w http.ResponseWriter, r *http.Request)
 }
 
 func (s *Server) handleReorderTasks(w http.ResponseWriter, r *http.Request) {
+	if _, ok := s.requireAuth(w, r); !ok {
+		return
+	}
+
 	ctx := parseRequestContext(r)
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -512,6 +629,10 @@ func (s *Server) handleReorderTasks(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleReorderSubtasks(w http.ResponseWriter, r *http.Request) {
+	if _, ok := s.requireAuth(w, r); !ok {
+		return
+	}
+
 	ctx := parseRequestContext(r)
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -534,6 +655,10 @@ func (s *Server) handleReorderSubtasks(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleDeleteCategory(w http.ResponseWriter, r *http.Request) {
+	if _, ok := s.requireAuth(w, r); !ok {
+		return
+	}
+
 	ctx := parseRequestContext(r)
 	id := r.PathValue("id")
 
@@ -553,6 +678,11 @@ func (s *Server) handleDeleteCategory(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleDeleteTask(w http.ResponseWriter, r *http.Request) {
+	auth, ok := s.requireAuth(w, r)
+	if !ok {
+		return
+	}
+
 	ctx := parseRequestContext(r)
 	id := r.PathValue("id")
 
@@ -579,7 +709,7 @@ func (s *Server) handleDeleteTask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.presentation.RenderSlideoverClear(w)
-	catView := NewCategoryView(cat, true, s.auth)
+	catView := NewCategoryView(cat, true, auth)
 	var buf bytes.Buffer
 	if err := s.presentation.RenderCategoryOOB(&buf, catView); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -589,6 +719,11 @@ func (s *Server) handleDeleteTask(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleDeleteSubtask(w http.ResponseWriter, r *http.Request) {
+	auth, ok := s.requireAuth(w, r)
+	if !ok {
+		return
+	}
+
 	ctx := parseRequestContext(r)
 	id := r.PathValue("id")
 
@@ -615,7 +750,7 @@ func (s *Server) handleDeleteSubtask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.presentation.RenderSlideoverClear(w)
-	catView := NewCategoryView(cat, true, s.auth)
+	catView := NewCategoryView(cat, true, auth)
 	var buf bytes.Buffer
 	if err := s.presentation.RenderCategoryOOB(&buf, catView); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -625,6 +760,11 @@ func (s *Server) handleDeleteSubtask(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleCreateTaskWorkLog(w http.ResponseWriter, r *http.Request) {
+	auth, ok := s.requireAuth(w, r)
+	if !ok {
+		return
+	}
+
 	ctx := parseRequestContext(r)
 	taskID := r.PathValue("id")
 
@@ -665,7 +805,7 @@ func (s *Server) handleCreateTaskWorkLog(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	catView := NewCategoryView(cat, true, s.auth)
+	catView := NewCategoryView(cat, true, auth)
 	if err := s.presentation.RenderCategoryOOB(w, catView); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -673,6 +813,11 @@ func (s *Server) handleCreateTaskWorkLog(w http.ResponseWriter, r *http.Request)
 }
 
 func (s *Server) handleCreateSubtaskWorkLog(w http.ResponseWriter, r *http.Request) {
+	auth, ok := s.requireAuth(w, r)
+	if !ok {
+		return
+	}
+
 	ctx := parseRequestContext(r)
 	subtaskID := r.PathValue("id")
 
@@ -713,7 +858,7 @@ func (s *Server) handleCreateSubtaskWorkLog(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	catView := NewCategoryView(cat, true, s.auth)
+	catView := NewCategoryView(cat, true, auth)
 	if err := s.presentation.RenderCategoryOOB(w, catView); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

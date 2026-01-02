@@ -33,9 +33,8 @@
             on click
                 set container to closest <li/>
                 toggle .collapsed on container
-                localStorage.setItem(container@data-ui-key, container matches .collapsed)"
-        >
-            <svg class="expand-toggle-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" >
+                localStorage.setItem(container@data-ui-key, container matches .collapsed)">
+            <svg class="expand-toggle-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <polyline points="6 9 12 15 18 9"></polyline>
             </svg>
         </button>
@@ -58,7 +57,7 @@
         {{range .Subtasks}} {{template "subtask.html" .}} {{end}}
         {{if .IsAuthenticated}}
         <li class="row add-item">
-            <button class="btn btn-add" hx-post="/tasks/{{.ID}}/subtasks" hx-target="closest li" hx-swap="beforebegin">
+            <button class="btn btn-add" hx-post="/tasks/{{.ID}}/subtasks?csrf={{.CSRFToken}}" hx-target="closest li" hx-swap="beforebegin">
                 <span class="arrow">→</span>
                 <span>Add a subtask</span>
             </button>

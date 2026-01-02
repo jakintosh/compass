@@ -15,8 +15,7 @@
         {{if .IsAuthenticated}}
         <form class="form-field">
             <label class="field-label">Name</label>
-            <input type="text" value="{{.Name}}" class="field-input" hx-patch="/categories/{{.ID}}" hx-trigger="change"
-                name="name" hx-swap="none" onkeydown="if(event.key=='Enter') this.blur()">
+            <input type="text" value="{{.Name}}" class="field-input" hx-patch="/categories/{{.ID}}?csrf={{.CSRFToken}}" hx-trigger="change" name="name" hx-swap="none" onkeydown="if(event.key=='Enter') this.blur()">
         </form>
         <form class="form-field">
             <label class="field-label">Description</label>

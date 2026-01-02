@@ -1,3 +1,18 @@
+// Get CSRF token from meta tag if present
+function getCsrfToken() {
+  const meta = document.querySelector('meta[name="csrf-token"]');
+  return meta ? meta.getAttribute("content") : "";
+}
+
+// Helper to add CSRF to values object
+function withCsrf(values) {
+  const csrf = getCsrfToken();
+  if (csrf) {
+    values.csrf = csrf;
+  }
+  return values;
+}
+
 document.addEventListener("htmx:load", function (evt) {
   if (window._hyperscript && window._hyperscript.processNode) {
     const target = evt.detail && evt.detail.elt ? evt.detail.elt : evt.target;
@@ -17,7 +32,7 @@ document.addEventListener("htmx:load", function (evt) {
       onEnd: function () {
         let ids = this.toArray();
         htmx.ajax("POST", "/categories/reorder", {
-          values: { id: ids },
+          values: withCsrf({ id: ids }),
           swap: "none",
         });
       },
@@ -41,10 +56,10 @@ document.addEventListener("htmx:load", function (evt) {
           });
 
           htmx.ajax("POST", "/tasks/reorder", {
-            values: {
+            values: withCsrf({
               category_id: catId,
               id: ids,
-            },
+            }),
             swap: "none",
           });
         },
@@ -70,10 +85,10 @@ document.addEventListener("htmx:load", function (evt) {
           });
 
           htmx.ajax("POST", "/subtasks/reorder", {
-            values: {
+            values: withCsrf({
               task_id: taskId,
               id: ids,
-            },
+            }),
             swap: "none",
           });
         },

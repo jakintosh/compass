@@ -41,7 +41,7 @@ func NewTaskView(t *domain.Task, oob bool, auth AuthContext) TaskView {
 	view.WorkLogs = NewWorkLogViewsFromTask(t)
 
 	view.DeleteButton = DeleteButtonView{
-		URL:            "/tasks/" + t.ID,
+		URL:            "/tasks/" + t.ID + "?csrf=" + auth.CSRFToken,
 		ConfirmMessage: "Delete this task?",
 		ButtonText:     "Delete Task",
 	}

@@ -10,6 +10,10 @@ import (
 // AuthContext carries authentication state through view models
 type AuthContext struct {
 	IsAuthenticated bool
+	Handle          string // Username from access token Subject()
+	CSRFToken       string // For CSRF protection on forms
+	LoginURL        string // Where login button should link
+	LogoutURL       string // Where logout button should link
 }
 
 type PageView struct {
@@ -23,12 +27,15 @@ type DeleteOOBView struct {
 	ID string
 }
 
-func (p *Presentation) RenderIndex(w io.Writer, categories []CategoryView) error {
-	return p.RenderIndexWithDetails(w, categories, nil)
+func (p *Presentation) RenderIndex(w io.Writer, categories []CategoryView, auth AuthContext) error {
+	return p.RenderIndexWithDetails(w, categories, auth, nil)
 }
 
-func (p *Presentation) RenderIndexWithDetails(w io.Writer, categories []CategoryView, detailsView any) error {
-	pageView := PageView{Categories: categories}
+func (p *Presentation) RenderIndexWithDetails(w io.Writer, categories []CategoryView, auth AuthContext, detailsView any) error {
+	pageView := PageView{
+		AuthContext: auth,
+		Categories:  categories,
+	}
 
 	if detailsView != nil {
 		var buf bytes.Buffer
@@ -40,6 +47,10 @@ func (p *Presentation) RenderIndexWithDetails(w io.Writer, categories []Category
 			}
 		case SubtaskView:
 			if err := p.tmpl.ExecuteTemplate(&buf, "subtask_details", v); err != nil {
+				return err
+			}
+		case CategoryView:
+			if err := p.tmpl.ExecuteTemplate(&buf, "category_details", v); err != nil {
 				return err
 			}
 		default:

@@ -89,6 +89,37 @@ body {
     letter-spacing: -0.025em;
 }
 
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+}
+
+.auth-section {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+}
+
+.user-handle {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-muted);
+}
+
+.btn-link {
+    text-decoration: none;
+    font-size: var(--font-size-sm);
+    color: var(--color-text-muted);
+    padding: var(--space-xs) var(--space-sm);
+    border-radius: 4px;
+    transition: color var(--transition-fast), background-color var(--transition-fast);
+}
+
+.btn-link:hover {
+    color: var(--color-text);
+    background-color: var(--color-surface);
+}
+
 .content-scroll {
     flex: 1;
     overflow-y: auto;
