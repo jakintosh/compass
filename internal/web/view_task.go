@@ -8,6 +8,7 @@ import (
 
 // TaskView is the view model for Task
 type TaskView struct {
+	AuthContext
 	ID           string
 	Name         string
 	Description  string
@@ -20,8 +21,9 @@ type TaskView struct {
 }
 
 // NewTaskView creates a TaskView from a domain Task
-func NewTaskView(t *domain.Task, oob bool) TaskView {
+func NewTaskView(t *domain.Task, oob bool, auth AuthContext) TaskView {
 	view := TaskView{
+		AuthContext: auth,
 		ID:          t.ID,
 		Name:        t.Name,
 		Description: t.Description,
@@ -32,7 +34,7 @@ func NewTaskView(t *domain.Task, oob bool) TaskView {
 		view.HasSubtasks = true
 		view.Subtasks = make([]SubtaskView, len(t.Subtasks))
 		for i, s := range t.Subtasks {
-			view.Subtasks[i] = NewSubtaskView(s, false)
+			view.Subtasks[i] = NewSubtaskView(s, false, auth)
 		}
 	}
 

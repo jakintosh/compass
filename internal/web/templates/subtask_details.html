@@ -12,6 +12,7 @@
     </div>
 
     <div class="slideover-body">
+        {{if .IsAuthenticated}}
         <form class="form-field">
             <label class="field-label">Name</label>
             <input type="text" value="{{.Name}}" class="field-input" hx-patch="/subtasks/{{.ID}}" hx-trigger="change"
@@ -49,12 +50,35 @@
 
             <div class="work-log-list">
                 {{range .WorkLogs}}
-                    {{template "work_log_entry" .}}
+                {{template "work_log_entry" .}}
                 {{end}}
             </div>
         </div>
 
         {{template "delete_button" .DeleteButton}}
+        {{else}}
+        <div class="form-field">
+            <label class="field-label">Name</label>
+            <div class="field-value">{{.Name}}</div>
+        </div>
+        <div class="form-field">
+            <label class="field-label">Description</label>
+            <div class="field-value">{{if .Description}}{{.Description}}{{else}}<em>No description</em>{{end}}</div>
+        </div>
+        <div class="form-field">
+            <label class="field-label">Completion</label>
+            <div class="field-value">{{.Completion}}%</div>
+        </div>
+
+        <div class="work-log-section">
+            <h3 class="section-title">Work Log</h3>
+            <div class="work-log-list">
+                {{range .WorkLogs}}
+                {{template "work_log_entry" .}}
+                {{end}}
+            </div>
+        </div>
+        {{end}}
     </div>
 </div>
 {{end}}

@@ -668,6 +668,17 @@ body {
     color: var(--color-text-faint);
 }
 
+.field-value {
+    font-size: var(--font-size-base);
+    color: var(--color-text);
+    padding: var(--space-sm) 0;
+}
+
+.field-value em {
+    color: var(--color-text-faint);
+    font-style: italic;
+}
+
 /* ==========================================
    Work Log Styles
    ========================================== */

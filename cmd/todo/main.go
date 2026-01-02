@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"log"
 	"net/http"
 
@@ -9,20 +10,31 @@ import (
 )
 
 func main() {
+	// Parse CLI flags
+	publicMode := flag.Bool("public", false, "Run in public read-only mode (no authentication)")
+	flag.Parse()
+
 	// Initialize Store
-	s, err := store.NewSQLiteStore("todo.db", true)
+	store, err := store.NewSQLiteStore("todo.db", true)
 	if err != nil {
 		log.Fatalf("Failed to initialize store: %v", err)
 	}
 
 	// Initialize Web Server
-	srv, err := web.NewServer(s)
+	opts := web.ServerOptions{
+		PublicMode: *publicMode,
+	}
+	srv, err := web.NewServer(store, opts)
 	if err != nil {
 		log.Fatalf("Failed to initialize server: %v", err)
 	}
 
 	// Start Server
-	log.Println("Starting server on :8080...")
+	if *publicMode {
+		log.Println("Starting server in PUBLIC (read-only) mode on :8080...")
+	} else {
+		log.Println("Starting server in AUTHENTICATED mode on :8080...")
+	}
 	if err := http.ListenAndServe(":8080", srv); err != nil {
 		log.Fatalf("Server failed: %v", err)
 	}

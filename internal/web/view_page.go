@@ -7,7 +7,13 @@ import (
 	"io"
 )
 
+// AuthContext carries authentication state through view models
+type AuthContext struct {
+	IsAuthenticated bool
+}
+
 type PageView struct {
+	AuthContext
 	Categories    []CategoryView
 	ActiveDetails template.HTML // Pre-rendered details for deep linking
 	OOB           bool          // Always false for full page renders

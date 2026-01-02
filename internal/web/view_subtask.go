@@ -8,6 +8,7 @@ import (
 
 // SubtaskView is the view model for Subtask
 type SubtaskView struct {
+	AuthContext
 	ID           string
 	Name         string
 	Description  string
@@ -18,8 +19,9 @@ type SubtaskView struct {
 }
 
 // NewSubtaskView creates a SubtaskView from a domain Subtask
-func NewSubtaskView(s *domain.Subtask, oob bool) SubtaskView {
+func NewSubtaskView(s *domain.Subtask, oob bool, auth AuthContext) SubtaskView {
 	return SubtaskView{
+		AuthContext: auth,
 		ID:          s.ID,
 		Name:        s.Name,
 		Description: s.Description,

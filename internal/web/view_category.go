@@ -8,6 +8,7 @@ import (
 
 // CategoryView is the view model for Category
 type CategoryView struct {
+	AuthContext
 	ID                string
 	Name              string
 	Description       string
@@ -19,8 +20,9 @@ type CategoryView struct {
 }
 
 // NewCategoryView creates a CategoryView from a domain Category
-func NewCategoryView(c *domain.Category, oob bool) CategoryView {
+func NewCategoryView(c *domain.Category, oob bool, auth AuthContext) CategoryView {
 	view := CategoryView{
+		AuthContext:       auth,
 		ID:                c.ID,
 		Name:              c.Name,
 		Description:       c.Description,
@@ -31,7 +33,7 @@ func NewCategoryView(c *domain.Category, oob bool) CategoryView {
 	if len(c.Tasks) > 0 {
 		view.Tasks = make([]TaskView, len(c.Tasks))
 		for i, t := range c.Tasks {
-			view.Tasks[i] = NewTaskView(t, false)
+			view.Tasks[i] = NewTaskView(t, false, auth)
 		}
 	}
 

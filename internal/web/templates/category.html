@@ -8,6 +8,7 @@
 
 <li class="category" id="category-{{.ID}}" data-id="{{.ID}}" data-ui-key="ui.category.{{.ID}}.collapsed" data-ui-class="collapsed" {{if .OOB}}hx-swap-oob="true"{{end}}>
     <div class="row category-header">
+        {{if .IsAuthenticated}}
         <!-- Drag handle -->
         <div class="drag-handle hover-reveal">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" >
@@ -19,6 +20,7 @@
                 <circle cx="15" cy="19" r="1" />
             </svg>
         </div>
+        {{end}}
 
         <!-- Collapse/expand arrow indicator (clickable toggle button) -->
         <button type="button" class="expand-toggle-btn" _="
@@ -48,11 +50,13 @@
     <ul class="tasks-list" id="tasks-list-{{.ID}}" data-category-id="{{.ID}}">
         {{range .Tasks}} {{template "task.html" .}} {{end}}
 
+        {{if .IsAuthenticated}}
         <li class="row add-item">
             <button class="btn btn-add" hx-post="/categories/{{.ID}}/tasks" hx-target="closest li" hx-swap="beforebegin">
                 <span class="arrow">→</span>
                 <span>Add a task</span>
             </button>
         </li>
+        {{end}}
     </ul>
 </li>

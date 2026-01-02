@@ -14,6 +14,7 @@
 
 <li class="task-item" id="task-{{.ID}}" data-id="{{.ID}}" data-ui-key="ui.task.{{.ID}}.collapsed" data-ui-class="collapsed" {{if .OOB}}hx-swap-oob="true"{{end}}>
     <div class="row">
+        {{if .IsAuthenticated}}
         <!-- Drag handle -->
         <div class="drag-handle hover-reveal">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -25,6 +26,7 @@
                 <circle cx="15" cy="19" r="1" />
             </svg>
         </div>
+        {{end}}
 
         <!-- Expand/collapse arrow (clickable toggle button) -->
         <button type="button" class="expand-toggle-btn" _="
@@ -54,11 +56,13 @@
     <!-- Subtasks section -->
     <ul id="subtasks-list-{{.ID}}" class="subtasks-list">
         {{range .Subtasks}} {{template "subtask.html" .}} {{end}}
+        {{if .IsAuthenticated}}
         <li class="row add-item">
             <button class="btn btn-add" hx-post="/tasks/{{.ID}}/subtasks" hx-target="closest li" hx-swap="beforebegin">
                 <span class="arrow">→</span>
                 <span>Add a subtask</span>
             </button>
         </li>
+        {{end}}
     </ul>
 </li>
