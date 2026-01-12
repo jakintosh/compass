@@ -3,7 +3,7 @@ package web
 import (
 	"io"
 
-	"git.sr.ht/~jakintosh/todo/internal/domain"
+	"git.sr.ht/~jakintosh/compass/internal/domain"
 )
 
 // SubtaskView is the view model for Subtask

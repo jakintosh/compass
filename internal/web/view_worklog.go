@@ -3,7 +3,7 @@ package web
 import (
 	"fmt"
 
-	"git.sr.ht/~jakintosh/todo/internal/domain"
+	"git.sr.ht/~jakintosh/compass/internal/domain"
 )
 
 // WorkLogView is the view model for WorkLog

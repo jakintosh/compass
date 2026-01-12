@@ -1,4 +1,4 @@
-module git.sr.ht/~jakintosh/todo
+module git.sr.ht/~jakintosh/compass
 
 go 1.25.4
 

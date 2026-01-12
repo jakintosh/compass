@@ -15,8 +15,8 @@ import (
 	"git.sr.ht/~jakintosh/consent/pkg/client"
 	contesting "git.sr.ht/~jakintosh/consent/pkg/testing"
 	"git.sr.ht/~jakintosh/consent/pkg/tokens"
-	"git.sr.ht/~jakintosh/todo/internal/store"
-	"git.sr.ht/~jakintosh/todo/internal/web"
+	"git.sr.ht/~jakintosh/compass/internal/store"
+	"git.sr.ht/~jakintosh/compass/internal/web"
 )
 
 // getConfigValue returns the CLI flag value if set, otherwise falls back to env var.
@@ -41,7 +41,7 @@ func main() {
 	resolvedAppID := getConfigValue(*appID, "APP_ID")
 
 	// Initialize Store
-	store, err := store.NewSQLiteStore("todo.db", true)
+	store, err := store.NewSQLiteStore("compass.db", true)
 	if err != nil {
 		log.Fatalf("Failed to initialize store: %v", err)
 	}
@@ -56,7 +56,7 @@ func main() {
 			log.Fatalf("Failed to get/generate dev key: %v", err)
 		}
 
-		env := contesting.NewTestEnvWithKey(key, "localhost", "todo-dev")
+		env := contesting.NewTestEnvWithKey(key, "localhost", "compass-dev")
 		tv := contesting.NewTestVerifierWithEnv(env)
 
 		authConfig = web.AuthConfig{

@@ -2,9 +2,9 @@
 
 # Build the application
 build:
-	@echo "Building todo..."
+	@echo "Building compass..."
 	@mkdir -p bin
-	@go build -o bin/todo ./cmd/todo
+	@go build -o bin/compass ./cmd/compass
 
 # Run tests
 test: build
@@ -13,8 +13,8 @@ test: build
 
 # Run the application
 run: build
-	@echo "Running todo..."
-	@./bin/todo --dev
+	@echo "Running compass..."
+	@./bin/compass --dev
 
 # Clean build artifacts
 clean:

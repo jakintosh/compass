@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"git.sr.ht/~jakintosh/consent/pkg/client"
-	"git.sr.ht/~jakintosh/todo/internal/domain"
+	"git.sr.ht/~jakintosh/compass/internal/domain"
 )
 
 // AuthConfig configures authentication for the server.

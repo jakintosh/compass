@@ -1,4 +1,4 @@
-# Vibes Todo
+# Compass
 
 A minimal, single-page todo application that uses sliders instead of checkboxes. Each task represents progress on a continuum from 0% to 100%, rather than a binary done/not-done state.
 

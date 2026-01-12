@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"git.sr.ht/~jakintosh/todo/internal/domain"
+	"git.sr.ht/~jakintosh/compass/internal/domain"
 	"github.com/google/uuid"
 	_ "modernc.org/sqlite"
 )
