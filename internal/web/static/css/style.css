@@ -821,6 +821,139 @@ body {
     opacity: 0.9;
 }
 
+/* Form Expandable Section */
+.form-more-toggle {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    margin-top: var(--space-md);
+    cursor: pointer;
+    user-select: none;
+    transition: opacity var(--transition-fast);
+}
+
+.form-more-toggle:hover {
+    opacity: 0.7;
+}
+
+.form-more-line {
+    flex: 1;
+    height: 1px;
+    background: var(--color-border);
+}
+
+/* Extends .field-label pattern */
+.form-more-text {
+    font-size: var(--font-size-xs);
+    font-weight: 500;
+    color: var(--color-text-muted);
+    white-space: nowrap;
+    transition: color var(--transition-fast);
+}
+
+.form-more-toggle.open .form-more-text {
+    color: var(--color-text);
+}
+
+.form-more-toggle.open .form-more-text::before {
+    content: "− ";
+}
+
+.form-more-toggle:not(.open) .form-more-text::before {
+    content: "+ ";
+}
+
+.form-expandable {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height var(--transition-normal) ease-out;
+}
+
+.form-expandable.open {
+    max-height: 150px;
+}
+
+/* Extends .form-field pattern (flex column with gap) */
+.form-expandable-content {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+    padding: var(--space-md) 4px 4px 4px;
+}
+
+/* Toggle Switch - built on .field-label and accent colors */
+.toggle-switch-label {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-md);
+    cursor: pointer;
+    user-select: none;
+}
+
+/* Extends .field-label pattern */
+.toggle-switch-text {
+    font-size: var(--font-size-sm);
+    font-weight: 500;
+    color: var(--color-text-muted);
+}
+
+.toggle-switch-input {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+/* Uses design system colors: surface, border, accent */
+.toggle-switch-slider {
+    position: relative;
+    width: 40px;
+    height: 22px;
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 11px;
+    transition: background-color var(--transition-fast), border-color var(--transition-fast);
+    flex-shrink: 0;
+}
+
+.toggle-switch-slider::before {
+    content: "";
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 16px;
+    height: 16px;
+    background-color: var(--color-text-muted);
+    border-radius: 50%;
+    transition: transform var(--transition-fast), background-color var(--transition-fast);
+}
+
+.toggle-switch-input:checked + .toggle-switch-slider {
+    background-color: var(--color-accent-muted);
+    border-color: var(--color-accent);
+}
+
+.toggle-switch-input:checked + .toggle-switch-slider::before {
+    transform: translateX(18px);
+    background-color: var(--color-accent);
+}
+
+.toggle-switch-input:focus + .toggle-switch-slider {
+    box-shadow: 0 0 0 2px var(--color-accent-muted);
+}
+
+/* Extends .input-box - only adds datetime-specific sizing */
+.datetime-field {
+    width: 100%;
+    padding: var(--space-sm);
+}
+
+.datetime-field:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
 /* Work Log Entries */
 .work-log-list {
     display: flex;

@@ -26,7 +26,12 @@
         <div class="work-log-section">
             <h3 class="section-title">Work Log</h3>
 
-            <form class="work-log-form" hx-post="/subtasks/{{.ID}}/work-logs?csrf={{.CSRFToken}}" hx-swap="none" hx-on::after-request="this.reset()">
+            <form class="work-log-form" hx-post="/subtasks/{{.ID}}/work-logs?csrf={{.CSRFToken}}" hx-swap="none" _="
+                    on htmx:afterRequest
+                        reset() me
+                        remove .open from .form-expandable in me
+                        remove .open from .form-more-toggle in me
+                ">
                 <div class="form-row-inline">
                     <div class="form-field-compact">
                         <label class="field-label">Completion</label>
@@ -43,6 +48,28 @@
                 <div class="form-row-inline">
                     <input type="text" name="work_description" class="input-box field-input-description" placeholder="What did you work on?" required>
                     <button type="submit" class="btn-log">Log</button>
+                </div>
+                <div class="form-more-toggle" _="
+                    on click
+                        toggle .open on me
+                        toggle .open on next <.form-expandable/>">
+                    <span class="form-more-line"></span>
+                    <span class="form-more-text">More</span>
+                    <span class="form-more-line"></span>
+                </div>
+                <div class="form-expandable">
+                    <div class="form-expandable-content">
+                        <label class="toggle-switch-label">
+                            <span class="toggle-switch-text">Custom Date/Time</span>
+                            <input type="checkbox" name="use_custom_time" class="toggle-switch-input" _="
+                                on change
+                                    set :dt to .datetime-field in closest .form-expandable-content
+                                    if my.checked remove @disabled from :dt
+                                    else add @disabled to :dt">
+                            <span class="toggle-switch-slider"></span>
+                        </label>
+                        <input type="datetime-local" name="custom_time" class="input-box datetime-field" disabled>
+                    </div>
                 </div>
             </form>
 

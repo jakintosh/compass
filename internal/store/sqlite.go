@@ -756,9 +756,12 @@ func (s *SQLiteStore) ReorderSubtasks(taskID string, subIDs []string) error {
 	return tx.Commit()
 }
 
-func (s *SQLiteStore) AddWorkLogForTask(taskID string, hoursWorked float64, workDescription string, completionEstimate int) (*domain.WorkLog, error) {
+func (s *SQLiteStore) AddWorkLogForTask(taskID string, hoursWorked float64, workDescription string, completionEstimate int, customTime *time.Time) (*domain.WorkLog, error) {
 	id := uuid.NewString()
-	now := time.Now()
+	timestamp := time.Now()
+	if customTime != nil {
+		timestamp = *customTime
+	}
 
 	tx, err := s.db.Begin()
 	if err != nil {
@@ -805,7 +808,7 @@ func (s *SQLiteStore) AddWorkLogForTask(taskID string, hoursWorked float64, work
 		hoursWorked,
 		workDescription,
 		completionEstimate,
-		now.Unix(),
+		timestamp.Unix(),
 	).Scan(
 		&wl.ID,
 		&wl.CategoryID,
@@ -839,9 +842,12 @@ func (s *SQLiteStore) AddWorkLogForTask(taskID string, hoursWorked float64, work
 	return &wl, nil
 }
 
-func (s *SQLiteStore) AddWorkLogForSubtask(subtaskID string, hoursWorked float64, workDescription string, completionEstimate int) (*domain.WorkLog, error) {
+func (s *SQLiteStore) AddWorkLogForSubtask(subtaskID string, hoursWorked float64, workDescription string, completionEstimate int, customTime *time.Time) (*domain.WorkLog, error) {
 	id := uuid.NewString()
-	now := time.Now()
+	timestamp := time.Now()
+	if customTime != nil {
+		timestamp = *customTime
+	}
 
 	tx, err := s.db.Begin()
 	if err != nil {
@@ -889,7 +895,7 @@ func (s *SQLiteStore) AddWorkLogForSubtask(subtaskID string, hoursWorked float64
 		hoursWorked,
 		workDescription,
 		completionEstimate,
-		now.Unix(),
+		timestamp.Unix(),
 	).Scan(
 		&wl.ID,
 		&wl.CategoryID,

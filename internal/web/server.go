@@ -6,9 +6,10 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
-	"git.sr.ht/~jakintosh/consent/pkg/client"
 	"git.sr.ht/~jakintosh/compass/internal/domain"
+	"git.sr.ht/~jakintosh/consent/pkg/client"
 )
 
 // AuthConfig configures authentication for the server.
@@ -787,7 +788,17 @@ func (s *Server) handleCreateTaskWorkLog(w http.ResponseWriter, r *http.Request)
 
 	workDescription := r.FormValue("work_description")
 
-	workLog, err := s.store.AddWorkLogForTask(taskID, hoursWorked, workDescription, completionEstimate)
+	// Parse optional custom timestamp
+	var customTime *time.Time
+	if r.FormValue("use_custom_time") == "on" {
+		if ct := r.FormValue("custom_time"); ct != "" {
+			if parsed, err := time.ParseInLocation("2006-01-02T15:04", ct, time.Local); err == nil {
+				customTime = &parsed
+			}
+		}
+	}
+
+	workLog, err := s.store.AddWorkLogForTask(taskID, hoursWorked, workDescription, completionEstimate, customTime)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -840,7 +851,17 @@ func (s *Server) handleCreateSubtaskWorkLog(w http.ResponseWriter, r *http.Reque
 
 	workDescription := r.FormValue("work_description")
 
-	workLog, err := s.store.AddWorkLogForSubtask(subtaskID, hoursWorked, workDescription, completionEstimate)
+	// Parse optional custom timestamp
+	var customTime *time.Time
+	if r.FormValue("use_custom_time") == "on" {
+		if ct := r.FormValue("custom_time"); ct != "" {
+			if parsed, err := time.ParseInLocation("2006-01-02T15:04", ct, time.Local); err == nil {
+				customTime = &parsed
+			}
+		}
+	}
+
+	workLog, err := s.store.AddWorkLogForSubtask(subtaskID, hoursWorked, workDescription, completionEstimate, customTime)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

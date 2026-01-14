@@ -1,5 +1,7 @@
 package domain
 
+import "time"
+
 type Store interface {
 	GetCategories() ([]*Category, error)
 	GetCategory(id string) (*Category, error)
@@ -20,8 +22,8 @@ type Store interface {
 	DeleteSubtask(id string) (*Subtask, error)
 	ReorderSubtasks(taskID string, subIDs []string) error
 
-	AddWorkLogForTask(taskID string, hoursWorked float64, workDescription string, completionEstimate int) (*WorkLog, error)
-	AddWorkLogForSubtask(subtaskID string, hoursWorked float64, workDescription string, completionEstimate int) (*WorkLog, error)
+	AddWorkLogForTask(taskID string, hoursWorked float64, workDescription string, completionEstimate int, customTime *time.Time) (*WorkLog, error)
+	AddWorkLogForSubtask(subtaskID string, hoursWorked float64, workDescription string, completionEstimate int, customTime *time.Time) (*WorkLog, error)
 	GetWorkLogsForSubtask(subtaskID string) ([]*WorkLog, error)
 	GetWorkLogsForTask(taskID string) ([]*WorkLog, error)
 	GetWorkLogsForCategory(categoryID string) ([]*WorkLog, error)
