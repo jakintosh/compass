@@ -881,6 +881,24 @@ func (s *Server) handleCreateTaskWorkLog(w http.ResponseWriter, r *http.Request)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+
+	// Re-fetch task with work logs and render slideover OOB update
+	task, err := s.store.GetTask(taskID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	taskWorkLogs, err := s.store.GetWorkLogsForTask(taskID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	task.WorkLogs = taskWorkLogs
+
+	taskView := NewTaskView(task, false, auth)
+	if err := s.presentation.RenderSlideoverWithDetails(w, taskView); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }
 
 func (s *Server) handleCreateSubtaskWorkLog(w http.ResponseWriter, r *http.Request) {
@@ -943,5 +961,23 @@ func (s *Server) handleCreateSubtaskWorkLog(w http.ResponseWriter, r *http.Reque
 	if err := s.presentation.RenderCategoryOOB(w, catView); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
+	}
+
+	// Re-fetch subtask with work logs and render slideover OOB update
+	sub, err := s.store.GetSubtask(subtaskID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	subWorkLogs, err := s.store.GetWorkLogsForSubtask(subtaskID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	sub.WorkLogs = subWorkLogs
+
+	subtaskView := NewSubtaskView(sub, false, auth)
+	if err := s.presentation.RenderSlideoverWithDetails(w, subtaskView); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
