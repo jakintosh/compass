@@ -14,29 +14,34 @@ type WorkLog struct {
 }
 
 type Subtask struct {
-	ID          string     `json:"id"`
-	TaskID      string     `json:"task_id"`
-	CategoryID  string     `json:"category_id"`
-	Name        string     `json:"name"`
-	Description string     `json:"description"`
-	Completion  int        `json:"completion"` // 0-100
-	WorkLogs    []*WorkLog `json:"work_logs,omitempty"`
+	ID           string     `json:"id"`
+	TaskID       string     `json:"task_id"`
+	CategoryID   string     `json:"category_id"`
+	Name         string     `json:"name"`
+	Description  string     `json:"description"`
+	Completion   int        `json:"completion"` // 0-100
+	Public       bool       `json:"public"`
+	ParentPublic bool       `json:"parent_public"` // category.public AND task.public
+	WorkLogs     []*WorkLog `json:"work_logs,omitempty"`
 }
 
 type Task struct {
-	ID          string     `json:"id"`
-	CategoryID  string     `json:"category_id"`
-	Name        string     `json:"name"`
-	Description string     `json:"description"`
-	Completion  int        `json:"completion"` // 0-100
-	Subtasks    []*Subtask `json:"subtasks"`
-	WorkLogs    []*WorkLog `json:"work_logs,omitempty"`
+	ID           string     `json:"id"`
+	CategoryID   string     `json:"category_id"`
+	Name         string     `json:"name"`
+	Description  string     `json:"description"`
+	Completion   int        `json:"completion"` // 0-100
+	Public       bool       `json:"public"`
+	ParentPublic bool       `json:"parent_public"` // category.public
+	Subtasks     []*Subtask `json:"subtasks"`
+	WorkLogs     []*WorkLog `json:"work_logs,omitempty"`
 }
 
 type Category struct {
 	ID          string     `json:"id"`
 	Name        string     `json:"name"`
 	Description string     `json:"description"`
+	Public      bool       `json:"public"`
 	Tasks       []*Task    `json:"tasks"`
 	WorkLogs    []*WorkLog `json:"work_logs,omitempty"`
 }

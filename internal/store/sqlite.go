@@ -63,6 +63,7 @@ func (s *SQLiteStore) migrate() error {
 			id TEXT PRIMARY KEY,
 			name TEXT NOT NULL,
 			description TEXT DEFAULT '',
+			public INTEGER DEFAULT 1,
 			sort_order INTEGER DEFAULT 0
 		);
 
@@ -72,6 +73,7 @@ func (s *SQLiteStore) migrate() error {
 			name TEXT NOT NULL,
 			description TEXT DEFAULT '',
 			completion INTEGER DEFAULT 0,
+			public INTEGER DEFAULT 1,
 			sort_order INTEGER DEFAULT 0,
 			FOREIGN KEY(category_id) REFERENCES categories(id) ON DELETE CASCADE
 		);
@@ -83,6 +85,7 @@ func (s *SQLiteStore) migrate() error {
 			name TEXT NOT NULL,
 			description TEXT DEFAULT '',
 			completion INTEGER DEFAULT 0,
+			public INTEGER DEFAULT 1,
 			sort_order INTEGER DEFAULT 0,
 			FOREIGN KEY(task_id) REFERENCES tasks(id) ON DELETE CASCADE,
 			FOREIGN KEY(category_id) REFERENCES categories(id) ON DELETE CASCADE
@@ -116,7 +119,8 @@ func (s *SQLiteStore) GetCategories() ([]*domain.Category, error) {
 		SELECT
 			id,
 			name,
-			description
+			description,
+			public
 		FROM categories
 		ORDER BY sort_order ASC`,
 	)
@@ -131,6 +135,7 @@ func (s *SQLiteStore) GetCategories() ([]*domain.Category, error) {
 			&c.ID,
 			&c.Name,
 			&c.Description,
+			&c.Public,
 		); err != nil {
 			categoryRows.Close()
 			return nil, err
@@ -146,16 +151,19 @@ func (s *SQLiteStore) GetCategories() ([]*domain.Category, error) {
 		return nil, err
 	}
 
-	// get all tasks
+	// get all tasks with parent public from categories
 	taskRows, err := s.db.Query(`
 		SELECT
-			id,
-			category_id,
-			name,
-			description,
-			completion
-		FROM tasks
-		ORDER BY sort_order ASC`,
+			t.id,
+			t.category_id,
+			t.name,
+			t.description,
+			t.completion,
+			t.public,
+			c.public AS parent_public
+		FROM tasks t
+		JOIN categories c ON t.category_id = c.id
+		ORDER BY t.sort_order ASC`,
 	)
 	if err != nil {
 		return nil, err
@@ -171,6 +179,8 @@ func (s *SQLiteStore) GetCategories() ([]*domain.Category, error) {
 			&t.Name,
 			&t.Description,
 			&t.Completion,
+			&t.Public,
+			&t.ParentPublic,
 		); err != nil {
 			taskRows.Close()
 			return nil, err
@@ -187,17 +197,21 @@ func (s *SQLiteStore) GetCategories() ([]*domain.Category, error) {
 		return nil, err
 	}
 
-	// get all subtasks
+	// get all subtasks with parent public from tasks and categories
 	subRows, err := s.db.Query(`
 		SELECT
-			id,
-			task_id,
-			category_id,
-			name,
-			description,
-			completion
-		FROM subtasks
-		ORDER BY sort_order ASC`,
+			s.id,
+			s.task_id,
+			s.category_id,
+			s.name,
+			s.description,
+			s.completion,
+			s.public,
+			(c.public AND t.public) AS parent_public
+		FROM subtasks s
+		JOIN tasks t ON s.task_id = t.id
+		JOIN categories c ON s.category_id = c.id
+		ORDER BY s.sort_order ASC`,
 	)
 	if err != nil {
 		return nil, err
@@ -213,6 +227,8 @@ func (s *SQLiteStore) GetCategories() ([]*domain.Category, error) {
 			&sub.Name,
 			&sub.Description,
 			&sub.Completion,
+			&sub.Public,
+			&sub.ParentPublic,
 		); err != nil {
 			return nil, err
 		}
@@ -248,7 +264,8 @@ func (s *SQLiteStore) GetCategory(id string) (*domain.Category, error) {
 		SELECT
 			id,
 			name,
-			description
+			description,
+			public
 		FROM categories
 		WHERE id = ?1`,
 		id,
@@ -257,6 +274,7 @@ func (s *SQLiteStore) GetCategory(id string) (*domain.Category, error) {
 		&c.ID,
 		&c.Name,
 		&c.Description,
+		&c.Public,
 	); err != nil {
 		return nil, err
 	}
@@ -273,14 +291,17 @@ func (s *SQLiteStore) GetCategory(id string) (*domain.Category, error) {
 func (s *SQLiteStore) getTasksForCategory(catID string) ([]*domain.Task, error) {
 	taskRows, err := s.db.Query(`
 		SELECT
-			id,
-			category_id,
-			name,
-			description,
-			completion
-		FROM tasks
-		WHERE category_id = ?1
-		ORDER BY sort_order ASC`,
+			t.id,
+			t.category_id,
+			t.name,
+			t.description,
+			t.completion,
+			t.public,
+			c.public AS parent_public
+		FROM tasks t
+		JOIN categories c ON t.category_id = c.id
+		WHERE t.category_id = ?1
+		ORDER BY t.sort_order ASC`,
 		catID,
 	)
 	if err != nil {
@@ -296,6 +317,8 @@ func (s *SQLiteStore) getTasksForCategory(catID string) ([]*domain.Task, error) 
 			&t.Name,
 			&t.Description,
 			&t.Completion,
+			&t.Public,
+			&t.ParentPublic,
 		); err != nil {
 			taskRows.Close()
 			return nil, err
@@ -324,15 +347,19 @@ func (s *SQLiteStore) getTasksForCategory(catID string) ([]*domain.Task, error) 
 func (s *SQLiteStore) getSubtasksForTask(taskID string) ([]*domain.Subtask, error) {
 	subtaskRows, err := s.db.Query(`
 		SELECT
-			id,
-			task_id,
-			category_id,
-			name,
-			description,
-			completion
-		FROM subtasks
-		WHERE task_id = ?1
-		ORDER BY sort_order ASC`,
+			s.id,
+			s.task_id,
+			s.category_id,
+			s.name,
+			s.description,
+			s.completion,
+			s.public,
+			(c.public AND t.public) AS parent_public
+		FROM subtasks s
+		JOIN tasks t ON s.task_id = t.id
+		JOIN categories c ON s.category_id = c.id
+		WHERE s.task_id = ?1
+		ORDER BY s.sort_order ASC`,
 		taskID,
 	)
 	if err != nil {
@@ -350,6 +377,8 @@ func (s *SQLiteStore) getSubtasksForTask(taskID string) ([]*domain.Subtask, erro
 			&sub.Name,
 			&sub.Description,
 			&sub.Completion,
+			&sub.Public,
+			&sub.ParentPublic,
 		); err != nil {
 			return nil, err
 		}
@@ -365,22 +394,29 @@ func (s *SQLiteStore) AddCategory(name string) (*domain.Category, error) {
 	s.db.QueryRow("SELECT MIN(sort_order) FROM categories").Scan(&minOrder)
 	order := int(minOrder.Int64) - 1
 
-	_, err := s.db.Exec(`
+	var cat domain.Category
+	if err := s.db.QueryRow(`
 		INSERT INTO categories (id, name, sort_order)
-		VALUES (?1, ?2, ?3)`,
+		VALUES (?1, ?2, ?3)
+		RETURNING
+			id,
+			name,
+			description,
+			public`,
 		id,
 		name,
 		order,
-	)
-	if err != nil {
+	).Scan(
+		&cat.ID,
+		&cat.Name,
+		&cat.Description,
+		&cat.Public,
+	); err != nil {
 		return nil, err
 	}
 
-	return &domain.Category{
-		ID:    id,
-		Name:  name,
-		Tasks: []*domain.Task{},
-	}, nil
+	cat.Tasks = []*domain.Task{}
+	return &cat, nil
 }
 
 func (s *SQLiteStore) UpdateCategory(cat *domain.Category) (*domain.Category, error) {
@@ -388,23 +424,33 @@ func (s *SQLiteStore) UpdateCategory(cat *domain.Category) (*domain.Category, er
 	if err := s.db.QueryRow(
 		`UPDATE categories
 			SET name = ?1,
-				description = ?2
-			WHERE id = ?3
+				description = ?2,
+				public = ?3
+			WHERE id = ?4
 		RETURNING
 			id,
 			name,
-			description`,
+			description,
+			public`,
 		cat.Name,
 		cat.Description,
+		cat.Public,
 		cat.ID,
 	).Scan(
 		&updated.ID,
 		&updated.Name,
 		&updated.Description,
+		&updated.Public,
 	); err != nil {
 		return nil, err
 	}
-	updated.Tasks = cat.Tasks
+
+	tasks, err := s.getTasksForCategory(updated.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	updated.Tasks = tasks
 	return &updated, nil
 }
 
@@ -453,13 +499,16 @@ func (s *SQLiteStore) GetTask(id string) (*domain.Task, error) {
 	var t domain.Task
 	err := s.db.QueryRow(`
 		SELECT
-			id,
-			category_id,
-			name,
-			description,
-			completion
-		FROM tasks
-		WHERE id = ?1`,
+			t.id,
+			t.category_id,
+			t.name,
+			t.description,
+			t.completion,
+			t.public,
+			c.public AS parent_public
+		FROM tasks t
+		JOIN categories c ON t.category_id = c.id
+		WHERE t.id = ?1`,
 		id,
 	).Scan(
 		&t.ID,
@@ -467,6 +516,8 @@ func (s *SQLiteStore) GetTask(id string) (*domain.Task, error) {
 		&t.Name,
 		&t.Description,
 		&t.Completion,
+		&t.Public,
+		&t.ParentPublic,
 	)
 	if err != nil {
 		return nil, err
@@ -491,22 +542,34 @@ func (s *SQLiteStore) AddTask(catID string, name string) (*domain.Task, error) {
 	).Scan(&maxOrder)
 	order := int(maxOrder.Int64) + 1
 
-	if _, err := s.db.Exec(`
+	var task domain.Task
+	if err := s.db.QueryRow(`
 		INSERT INTO tasks (id, category_id, name, sort_order)
-		VALUES (?1, ?2, ?3, ?4)`,
+		VALUES (?1, ?2, ?3, ?4)
+		RETURNING
+			id,
+			category_id,
+			name,
+			description,
+			completion,
+			public`,
 		id,
 		catID,
 		name,
 		order,
+	).Scan(
+		&task.ID,
+		&task.CategoryID,
+		&task.Name,
+		&task.Description,
+		&task.Completion,
+		&task.Public,
 	); err != nil {
 		return nil, err
 	}
-	return &domain.Task{
-		ID:         id,
-		CategoryID: catID,
-		Name:       name,
-		Subtasks:   []*domain.Subtask{},
-	}, nil
+
+	task.Subtasks = []*domain.Subtask{}
+	return &task, nil
 }
 
 func (s *SQLiteStore) UpdateTask(task *domain.Task) (*domain.Task, error) {
@@ -515,17 +578,20 @@ func (s *SQLiteStore) UpdateTask(task *domain.Task) (*domain.Task, error) {
 		UPDATE tasks
 		SET name = ?1,
 			description = ?2,
-			completion = ?3
-		WHERE id = ?4
+			completion = ?3,
+			public = ?4
+		WHERE id = ?5
 		RETURNING
 			id,
 			category_id,
 			name,
 			description,
-			completion`,
+			completion,
+			public`,
 		task.Name,
 		task.Description,
 		task.Completion,
+		task.Public,
 		task.ID,
 	).Scan(
 		&updated.ID,
@@ -533,6 +599,7 @@ func (s *SQLiteStore) UpdateTask(task *domain.Task) (*domain.Task, error) {
 		&updated.Name,
 		&updated.Description,
 		&updated.Completion,
+		&updated.Public,
 	); err != nil {
 		return nil, err
 	}
@@ -593,14 +660,18 @@ func (s *SQLiteStore) GetSubtask(id string) (*domain.Subtask, error) {
 	var sub domain.Subtask
 	err := s.db.QueryRow(
 		`SELECT
-			id,
-			task_id,
-			category_id,
-			name,
-			description,
-			completion
-		FROM subtasks
-		WHERE id = ?1`,
+			s.id,
+			s.task_id,
+			s.category_id,
+			s.name,
+			s.description,
+			s.completion,
+			s.public,
+			(c.public AND t.public) AS parent_public
+		FROM subtasks s
+		JOIN tasks t ON s.task_id = t.id
+		JOIN categories c ON s.category_id = c.id
+		WHERE s.id = ?1`,
 		id,
 	).Scan(
 		&sub.ID,
@@ -609,6 +680,8 @@ func (s *SQLiteStore) GetSubtask(id string) (*domain.Subtask, error) {
 		&sub.Name,
 		&sub.Description,
 		&sub.Completion,
+		&sub.Public,
+		&sub.ParentPublic,
 	)
 	if err != nil {
 		return nil, err
@@ -648,7 +721,8 @@ func (s *SQLiteStore) AddSubtask(taskID string, name string) (*domain.Subtask, e
 			category_id,
 			name,
 			description,
-			completion`,
+			completion,
+			public`,
 		id,
 		taskID,
 		name,
@@ -660,6 +734,7 @@ func (s *SQLiteStore) AddSubtask(taskID string, name string) (*domain.Subtask, e
 		&sub.Name,
 		&sub.Description,
 		&sub.Completion,
+		&sub.Public,
 	); err != nil {
 		return nil, err
 	}
@@ -677,18 +752,21 @@ func (s *SQLiteStore) UpdateSubtask(sub *domain.Subtask) (*domain.Subtask, error
 		UPDATE subtasks
 		SET name = ?1,
 			description = ?2,
-			completion = ?3
-		WHERE id = ?4
+			completion = ?3,
+			public = ?4
+		WHERE id = ?5
 		RETURNING
 			id,
 			task_id,
 			category_id,
 			name,
 			description,
-			completion`,
+			completion,
+			public`,
 		sub.Name,
 		sub.Description,
 		sub.Completion,
+		sub.Public,
 		sub.ID,
 	).Scan(
 		&updated.ID,
@@ -697,6 +775,7 @@ func (s *SQLiteStore) UpdateSubtask(sub *domain.Subtask) (*domain.Subtask, error
 		&updated.Name,
 		&updated.Description,
 		&updated.Completion,
+		&updated.Public,
 	); err != nil {
 		return nil, err
 	}

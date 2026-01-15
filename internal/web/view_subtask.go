@@ -13,6 +13,8 @@ type SubtaskView struct {
 	Name         string
 	Description  string
 	Completion   int
+	Public       bool
+	ParentPublic bool // Whether parent task (and its category) is public
 	WorkLogs     []WorkLogView
 	OOB          bool
 	DeleteButton DeleteButtonView
@@ -21,13 +23,15 @@ type SubtaskView struct {
 // NewSubtaskView creates a SubtaskView from a domain Subtask
 func NewSubtaskView(s *domain.Subtask, oob bool, auth AuthContext) SubtaskView {
 	return SubtaskView{
-		AuthContext: auth,
-		ID:          s.ID,
-		Name:        s.Name,
-		Description: s.Description,
-		Completion:  s.Completion,
-		WorkLogs:    NewWorkLogViewsFromSubtask(s),
-		OOB:         oob,
+		AuthContext:  auth,
+		ID:           s.ID,
+		Name:         s.Name,
+		Description:  s.Description,
+		Completion:   s.Completion,
+		Public:       s.Public,
+		ParentPublic: s.ParentPublic,
+		WorkLogs:     NewWorkLogViewsFromSubtask(s),
+		OOB:          oob,
 		DeleteButton: DeleteButtonView{
 			URL:            "/subtasks/" + s.ID + "?csrf=" + auth.CSRFToken,
 			ConfirmMessage: "Delete this subtask?",

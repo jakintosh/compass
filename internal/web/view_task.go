@@ -13,6 +13,8 @@ type TaskView struct {
 	Name         string
 	Description  string
 	Completion   int
+	Public       bool
+	ParentPublic bool // Whether parent category is public (for disabling toggle)
 	HasSubtasks  bool
 	Subtasks     []SubtaskView
 	WorkLogs     []WorkLogView
@@ -23,12 +25,14 @@ type TaskView struct {
 // NewTaskView creates a TaskView from a domain Task
 func NewTaskView(t *domain.Task, oob bool, auth AuthContext) TaskView {
 	view := TaskView{
-		AuthContext: auth,
-		ID:          t.ID,
-		Name:        t.Name,
-		Description: t.Description,
-		Completion:  t.Completion,
-		OOB:         oob,
+		AuthContext:  auth,
+		ID:           t.ID,
+		Name:         t.Name,
+		Description:  t.Description,
+		Completion:   t.Completion,
+		Public:       t.Public,
+		ParentPublic: t.ParentPublic,
+		OOB:          oob,
 	}
 	if len(t.Subtasks) > 0 {
 		view.HasSubtasks = true

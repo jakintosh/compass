@@ -13,13 +13,22 @@
 
     <div class="slideover-body">
         {{if .IsAuthenticated}}
-        <form class="form-field">
+        <form class="form-field" hx-patch="/tasks/{{.ID}}?csrf={{.CSRFToken}}" hx-trigger="change" hx-swap="none">
             <label class="field-label">Name</label>
-            <input type="text" value="{{.Name}}" class="field-input" hx-patch="/tasks/{{.ID}}?csrf={{.CSRFToken}}" hx-trigger="change" name="name" hx-swap="none" onkeydown="if(event.key=='Enter') this.blur()">
+            <input type="text" value="{{.Name}}" class="field-input" name="name" _="on keydown[key is 'Enter'] blur() me">
         </form>
-        <form class="form-field">
+        <form class="form-field" hx-patch="/tasks/{{.ID}}?csrf={{.CSRFToken}}" hx-trigger="change" hx-swap="none">
             <label class="field-label">Description</label>
-            <textarea rows="3" class="field-textarea" placeholder="Add a description..." hx-patch="/tasks/{{.ID}}?csrf={{.CSRFToken}}" hx-trigger="change" name="description" hx-swap="none" onkeydown="if(event.key=='Enter') this.blur()">{{.Description}}</textarea>
+            <textarea rows="3" class="field-textarea" placeholder="Add a description..." name="description">{{.Description}}</textarea>
+        </form>
+        <form class="form-field" hx-patch="/tasks/{{.ID}}?csrf={{.CSRFToken}}" hx-trigger="change" hx-swap="none">
+            <label class="toggle-switch-label">
+                <span class="toggle-switch-text">Public{{if not .ParentPublic}} (parent is private){{end}}</span>
+                <input type="checkbox" name="public" class="toggle-switch-input"
+                       {{if .Public}}checked{{end}}
+                       {{if not .ParentPublic}}disabled{{end}}>
+                <span class="toggle-switch-slider"></span>
+            </label>
         </form>
 
         <div class="work-log-section">

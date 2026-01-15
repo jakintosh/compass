@@ -156,6 +156,11 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Filter out non-public items for unauthenticated users
+	if !auth.IsAuthenticated {
+		cats = filterPublicCategories(cats)
+	}
+
 	// Convert to view models
 	catViews := make([]CategoryView, len(cats))
 	for i, c := range cats {
@@ -165,6 +170,35 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 	if err := s.presentation.RenderIndex(w, catViews, auth); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
+}
+
+// filterPublicCategories removes non-public categories, tasks, and subtasks
+func filterPublicCategories(cats []*domain.Category) []*domain.Category {
+	var result []*domain.Category
+	for _, c := range cats {
+		if !c.Public {
+			continue
+		}
+		// Filter tasks within public category
+		var publicTasks []*domain.Task
+		for _, t := range c.Tasks {
+			if !t.Public {
+				continue
+			}
+			// Filter subtasks within public task
+			var publicSubs []*domain.Subtask
+			for _, s := range t.Subtasks {
+				if s.Public {
+					publicSubs = append(publicSubs, s)
+				}
+			}
+			t.Subtasks = publicSubs
+			publicTasks = append(publicTasks, t)
+		}
+		c.Tasks = publicTasks
+		result = append(result, c)
+	}
+	return result
 }
 
 func (s *Server) handleCreateCategory(w http.ResponseWriter, r *http.Request) {
@@ -217,9 +251,11 @@ func (s *Server) handleUpdateCategory(w http.ResponseWriter, r *http.Request) {
 
 	if name := r.FormValue("name"); name != "" {
 		cat.Name = name
-	}
-	if desc := r.FormValue("description"); desc != "" {
+	} else if desc := r.FormValue("description"); desc != "" {
 		cat.Description = desc
+	} else {
+		// Public toggle form - checkbox sends "on" when checked, nothing when unchecked
+		cat.Public = r.FormValue("public") == "on"
 	}
 
 	cat, err = s.store.UpdateCategory(cat)
@@ -233,7 +269,7 @@ func (s *Server) handleUpdateCategory(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Render OOB updates for category name (in header)
+	// Render OOB updates for category
 	catView := NewCategoryView(cat, true, auth)
 	if err := s.presentation.RenderCategory(w, catView); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -248,6 +284,12 @@ func (s *Server) handleGetCategoryDetails(w http.ResponseWriter, r *http.Request
 	cat, err := s.store.GetCategory(id)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+
+	// Private items are not accessible to unauthenticated users
+	if !auth.IsAuthenticated && !cat.Public {
+		http.Error(w, "Not found", http.StatusNotFound)
 		return
 	}
 
@@ -344,17 +386,19 @@ func (s *Server) handleUpdateTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Handle form field updates - only one field per form submission
 	if name := r.FormValue("name"); name != "" {
 		task.Name = name
-	}
-	if desc := r.FormValue("description"); desc != "" {
+	} else if desc := r.FormValue("description"); desc != "" {
 		task.Description = desc
-	}
-	if comp := r.FormValue("completion"); comp != "" {
+	} else if comp := r.FormValue("completion"); comp != "" {
 		val, err := strconv.Atoi(comp)
 		if err == nil {
 			task.Completion = val
 		}
+	} else {
+		// Public toggle form
+		task.Public = r.FormValue("public") == "on"
 	}
 
 	task, err = s.store.UpdateTask(task)
@@ -402,6 +446,13 @@ func (s *Server) handleGetSubtaskDetails(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	sub.WorkLogs = workLogs
+
+	// Private items are not accessible to unauthenticated users
+	if !auth.IsAuthenticated && !sub.ParentPublic {
+		http.Error(w, "Not found", http.StatusNotFound)
+		return
+	}
+
 	subtaskView := NewSubtaskView(sub, false, auth)
 
 	if ctx.IsHTMX {
@@ -446,6 +497,13 @@ func (s *Server) handleGetTaskDetails(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	task.WorkLogs = workLogs
+
+	// Private items are not accessible to unauthenticated users
+	if !auth.IsAuthenticated && (!task.ParentPublic || !task.Public) {
+		http.Error(w, "Not found", http.StatusNotFound)
+		return
+	}
+
 	taskView := NewTaskView(task, false, auth)
 
 	if ctx.IsHTMX {
@@ -532,17 +590,19 @@ func (s *Server) handleUpdateSubtask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Handle form field updates - only one field per form submission
 	if name := r.FormValue("name"); name != "" {
 		sub.Name = name
-	}
-	if desc := r.FormValue("description"); desc != "" {
+	} else if desc := r.FormValue("description"); desc != "" {
 		sub.Description = desc
-	}
-	if comp := r.FormValue("completion"); comp != "" {
+	} else if comp := r.FormValue("completion"); comp != "" {
 		val, err := strconv.Atoi(comp)
 		if err == nil {
 			sub.Completion = val
 		}
+	} else {
+		// Public toggle form
+		sub.Public = r.FormValue("public") == "on"
 	}
 
 	sub, err = s.store.UpdateSubtask(sub)

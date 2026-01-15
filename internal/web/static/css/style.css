@@ -314,6 +314,13 @@ body {
     text-overflow: ellipsis;
 }
 
+.private-icon {
+    margin-left: var(--space-xs);
+    color: var(--color-text-muted);
+    flex-shrink: 0;
+    vertical-align: middle;
+}
+
 .item-spacer {
     flex: 1;
     min-width: 0;
@@ -345,6 +352,12 @@ body {
     display: flex;
     flex-direction: column;
     flex: 1;
+}
+
+.category-title-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
 }
 
 .category-name {

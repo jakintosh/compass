@@ -12,6 +12,7 @@ type CategoryView struct {
 	ID                string
 	Name              string
 	Description       string
+	Public            bool
 	AverageCompletion int
 	Tasks             []TaskView
 	WorkLogs          []WorkLogView
@@ -26,6 +27,7 @@ func NewCategoryView(c *domain.Category, oob bool, auth AuthContext) CategoryVie
 		ID:                c.ID,
 		Name:              c.Name,
 		Description:       c.Description,
+		Public:            c.Public,
 		AverageCompletion: c.AverageCompletion(),
 		OOB:               oob,
 		WorkLogs:          NewWorkLogViewsFromCategory(c),
