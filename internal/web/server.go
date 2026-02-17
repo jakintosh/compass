@@ -34,10 +34,10 @@ type ServerOptions struct {
 }
 
 type Server struct {
-	store        domain.Store
-	router       *http.ServeMux
-	presentation *Presentation
-	auth         AuthConfig
+	store    domain.Store
+	router   *http.ServeMux
+	renderer *Renderer
+	auth     AuthConfig
 }
 
 func NewServer(store domain.Store, opts ServerOptions) (*Server, error) {
@@ -45,15 +45,15 @@ func NewServer(store domain.Store, opts ServerOptions) (*Server, error) {
 		return nil, errors.New("Auth.Verifier is required")
 	}
 
-	pres, err := NewPresentation()
+	renderer, err := NewRenderer()
 	if err != nil {
 		return nil, err
 	}
 	s := &Server{
-		store:        store,
-		router:       http.NewServeMux(),
-		presentation: pres,
-		auth:         opts.Auth,
+		store:    store,
+		router:   http.NewServeMux(),
+		renderer: renderer,
+		auth:     opts.Auth,
 	}
 	s.routes()
 	return s, nil
@@ -167,7 +167,7 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 		catViews[i] = NewCategoryView(c, false, auth)
 	}
 
-	if err := s.presentation.RenderIndex(w, catViews, auth); err != nil {
+	if err := s.renderer.RenderIndex(w, catViews, auth); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
@@ -220,12 +220,12 @@ func (s *Server) handleCreateCategory(w http.ResponseWriter, r *http.Request) {
 	}
 
 	catView := NewCategoryView(cat, false, auth)
-	if err := s.presentation.RenderCategory(w, catView); err != nil {
+	if err := s.renderer.RenderCategory(w, catView); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	if err := s.presentation.RenderSlideoverWithDetails(w, catView); err != nil {
+	if err := s.renderer.RenderSlideoverWithDetails(w, catView); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
@@ -271,7 +271,7 @@ func (s *Server) handleUpdateCategory(w http.ResponseWriter, r *http.Request) {
 
 	// Render OOB updates for category
 	catView := NewCategoryView(cat, true, auth)
-	if err := s.presentation.RenderCategory(w, catView); err != nil {
+	if err := s.renderer.RenderCategory(w, catView); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
@@ -302,7 +302,7 @@ func (s *Server) handleGetCategoryDetails(w http.ResponseWriter, r *http.Request
 	cat.WorkLogs = workLogs
 
 	if ctx.IsHTMX {
-		if err := s.presentation.RenderCategoryDetails(w, NewCategoryView(cat, false, auth)); err != nil {
+		if err := s.renderer.RenderCategoryDetails(w, NewCategoryView(cat, false, auth)); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 		return
@@ -320,7 +320,7 @@ func (s *Server) handleGetCategoryDetails(w http.ResponseWriter, r *http.Request
 		catViews[i] = NewCategoryView(c, false, auth)
 	}
 
-	if err := s.presentation.RenderIndexWithDetails(w, catViews, auth, NewCategoryView(cat, false, auth)); err != nil {
+	if err := s.renderer.RenderIndexWithDetails(w, catViews, auth, NewCategoryView(cat, false, auth)); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
@@ -354,14 +354,14 @@ func (s *Server) handleCreateTask(w http.ResponseWriter, r *http.Request) {
 
 	catView := NewCategoryView(cat, true, auth)
 	var buf bytes.Buffer
-	if err := s.presentation.RenderCategoryOOB(&buf, catView); err != nil {
+	if err := s.renderer.RenderCategoryOOB(&buf, catView); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	w.Write(buf.Bytes())
 
 	taskView := NewTaskView(task, false, auth)
-	if err := s.presentation.RenderSlideoverWithDetails(w, taskView); err != nil {
+	if err := s.renderer.RenderSlideoverWithDetails(w, taskView); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
@@ -421,7 +421,7 @@ func (s *Server) handleUpdateTask(w http.ResponseWriter, r *http.Request) {
 
 	catView := NewCategoryView(cat, true, auth)
 	var buf bytes.Buffer
-	if err := s.presentation.RenderCategoryOOB(&buf, catView); err != nil {
+	if err := s.renderer.RenderCategoryOOB(&buf, catView); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -456,7 +456,7 @@ func (s *Server) handleGetSubtaskDetails(w http.ResponseWriter, r *http.Request)
 	subtaskView := NewSubtaskView(sub, false, auth)
 
 	if ctx.IsHTMX {
-		if err := s.presentation.RenderSubtaskDetails(w, subtaskView); err != nil {
+		if err := s.renderer.RenderSubtaskDetails(w, subtaskView); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 		return
@@ -474,7 +474,7 @@ func (s *Server) handleGetSubtaskDetails(w http.ResponseWriter, r *http.Request)
 		catViews[i] = NewCategoryView(c, false, auth)
 	}
 
-	if err := s.presentation.RenderIndexWithDetails(w, catViews, auth, subtaskView); err != nil {
+	if err := s.renderer.RenderIndexWithDetails(w, catViews, auth, subtaskView); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
@@ -507,7 +507,7 @@ func (s *Server) handleGetTaskDetails(w http.ResponseWriter, r *http.Request) {
 	taskView := NewTaskView(task, false, auth)
 
 	if ctx.IsHTMX {
-		if err := s.presentation.RenderTaskDetails(w, taskView); err != nil {
+		if err := s.renderer.RenderTaskDetails(w, taskView); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 		return
@@ -525,7 +525,7 @@ func (s *Server) handleGetTaskDetails(w http.ResponseWriter, r *http.Request) {
 		catViews[i] = NewCategoryView(c, false, auth)
 	}
 
-	if err := s.presentation.RenderIndexWithDetails(w, catViews, auth, taskView); err != nil {
+	if err := s.renderer.RenderIndexWithDetails(w, catViews, auth, taskView); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
@@ -559,14 +559,14 @@ func (s *Server) handleCreateSubtask(w http.ResponseWriter, r *http.Request) {
 
 	catView := NewCategoryView(cat, true, auth)
 	var buf bytes.Buffer
-	if err := s.presentation.RenderCategoryOOB(&buf, catView); err != nil {
+	if err := s.renderer.RenderCategoryOOB(&buf, catView); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	w.Write(buf.Bytes())
 
 	subtaskView := NewSubtaskView(sub, false, auth)
-	if err := s.presentation.RenderSlideoverWithDetails(w, subtaskView); err != nil {
+	if err := s.renderer.RenderSlideoverWithDetails(w, subtaskView); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
@@ -625,7 +625,7 @@ func (s *Server) handleUpdateSubtask(w http.ResponseWriter, r *http.Request) {
 
 	catView := NewCategoryView(cat, true, auth)
 	var buf bytes.Buffer
-	if err := s.presentation.RenderCategoryOOB(&buf, catView); err != nil {
+	if err := s.renderer.RenderCategoryOOB(&buf, catView); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -733,7 +733,7 @@ func (s *Server) handleDeleteCategory(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := s.presentation.RenderCategoryDeleteOOB(w, id); err != nil {
+	if err := s.renderer.RenderCategoryDeleteOOB(w, id); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
@@ -769,10 +769,10 @@ func (s *Server) handleDeleteTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.presentation.RenderSlideoverClear(w)
+	s.renderer.RenderSlideoverClear(w)
 	catView := NewCategoryView(cat, true, auth)
 	var buf bytes.Buffer
-	if err := s.presentation.RenderCategoryOOB(&buf, catView); err != nil {
+	if err := s.renderer.RenderCategoryOOB(&buf, catView); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -810,10 +810,10 @@ func (s *Server) handleDeleteSubtask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.presentation.RenderSlideoverClear(w)
+	s.renderer.RenderSlideoverClear(w)
 	catView := NewCategoryView(cat, true, auth)
 	var buf bytes.Buffer
-	if err := s.presentation.RenderCategoryOOB(&buf, catView); err != nil {
+	if err := s.renderer.RenderCategoryOOB(&buf, catView); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -877,7 +877,7 @@ func (s *Server) handleCreateTaskWorkLog(w http.ResponseWriter, r *http.Request)
 	}
 
 	catView := NewCategoryView(cat, true, auth)
-	if err := s.presentation.RenderCategoryOOB(w, catView); err != nil {
+	if err := s.renderer.RenderCategoryOOB(w, catView); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -896,7 +896,7 @@ func (s *Server) handleCreateTaskWorkLog(w http.ResponseWriter, r *http.Request)
 	task.WorkLogs = taskWorkLogs
 
 	taskView := NewTaskView(task, false, auth)
-	if err := s.presentation.RenderSlideoverWithDetails(w, taskView); err != nil {
+	if err := s.renderer.RenderSlideoverWithDetails(w, taskView); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
@@ -958,7 +958,7 @@ func (s *Server) handleCreateSubtaskWorkLog(w http.ResponseWriter, r *http.Reque
 	}
 
 	catView := NewCategoryView(cat, true, auth)
-	if err := s.presentation.RenderCategoryOOB(w, catView); err != nil {
+	if err := s.renderer.RenderCategoryOOB(w, catView); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -977,7 +977,7 @@ func (s *Server) handleCreateSubtaskWorkLog(w http.ResponseWriter, r *http.Reque
 	sub.WorkLogs = subWorkLogs
 
 	subtaskView := NewSubtaskView(sub, false, auth)
-	if err := s.presentation.RenderSlideoverWithDetails(w, subtaskView); err != nil {
+	if err := s.renderer.RenderSlideoverWithDetails(w, subtaskView); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }

@@ -49,22 +49,22 @@ func NewCategoryView(c *domain.Category, oob bool, auth AuthContext) CategoryVie
 }
 
 // RenderCategory renders a single category from its view model
-func (p *Presentation) RenderCategory(w io.Writer, view CategoryView) error {
+func (p *Renderer) RenderCategory(w io.Writer, view CategoryView) error {
 	return p.tmpl.ExecuteTemplate(w, "category.html", view)
 }
 
 // RenderCategoryDetails renders the category details slideover
-func (p *Presentation) RenderCategoryDetails(w io.Writer, view CategoryView) error {
+func (p *Renderer) RenderCategoryDetails(w io.Writer, view CategoryView) error {
 	return p.tmpl.ExecuteTemplate(w, "category_details", view)
 }
 
 // RenderCategoryOOB renders a category as an out-of-band update
-func (p *Presentation) RenderCategoryOOB(w io.Writer, view CategoryView) error {
+func (p *Renderer) RenderCategoryOOB(w io.Writer, view CategoryView) error {
 	return p.tmpl.ExecuteTemplate(w, "category.html", view)
 }
 
 // RenderCategoryDeleteOOB renders OOB updates for category deletion
-func (p *Presentation) RenderCategoryDeleteOOB(w io.Writer, id string) error {
+func (p *Renderer) RenderCategoryDeleteOOB(w io.Writer, id string) error {
 	if err := p.RenderSlideoverClear(w); err != nil {
 		return err
 	}

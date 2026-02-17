@@ -54,11 +54,11 @@ func NewTaskView(t *domain.Task, oob bool, auth AuthContext) TaskView {
 }
 
 // RenderTask renders a single task from its view model
-func (p *Presentation) RenderTask(w io.Writer, view TaskView) error {
+func (p *Renderer) RenderTask(w io.Writer, view TaskView) error {
 	return p.tmpl.ExecuteTemplate(w, "task.html", view)
 }
 
 // RenderTaskDetails renders the task details slideover
-func (p *Presentation) RenderTaskDetails(w io.Writer, view TaskView) error {
+func (p *Renderer) RenderTaskDetails(w io.Writer, view TaskView) error {
 	return p.tmpl.ExecuteTemplate(w, "details", view)
 }

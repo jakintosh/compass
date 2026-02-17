@@ -27,11 +27,11 @@ type DeleteOOBView struct {
 	ID string
 }
 
-func (p *Presentation) RenderIndex(w io.Writer, categories []CategoryView, auth AuthContext) error {
+func (p *Renderer) RenderIndex(w io.Writer, categories []CategoryView, auth AuthContext) error {
 	return p.RenderIndexWithDetails(w, categories, auth, nil)
 }
 
-func (p *Presentation) RenderIndexWithDetails(w io.Writer, categories []CategoryView, auth AuthContext, detailsView any) error {
+func (p *Renderer) RenderIndexWithDetails(w io.Writer, categories []CategoryView, auth AuthContext, detailsView any) error {
 	pageView := PageView{
 		AuthContext: auth,
 		Categories:  categories,
@@ -63,7 +63,7 @@ func (p *Presentation) RenderIndexWithDetails(w io.Writer, categories []Category
 	return p.tmpl.ExecuteTemplate(w, "layout.html", pageView)
 }
 
-func (p *Presentation) RenderSlideoverClear(w io.Writer) error {
+func (p *Renderer) RenderSlideoverClear(w io.Writer) error {
 	view := PageView{
 		ActiveDetails: "",
 		OOB:           true,
@@ -71,7 +71,7 @@ func (p *Presentation) RenderSlideoverClear(w io.Writer) error {
 	return p.tmpl.ExecuteTemplate(w, "slideover_container", view)
 }
 
-func (p *Presentation) RenderSlideoverWithDetails(w io.Writer, detailsView any) error {
+func (p *Renderer) RenderSlideoverWithDetails(w io.Writer, detailsView any) error {
 	var buf bytes.Buffer
 
 	switch v := detailsView.(type) {

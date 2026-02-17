@@ -41,11 +41,11 @@ func NewSubtaskView(s *domain.Subtask, oob bool, auth AuthContext) SubtaskView {
 }
 
 // RenderSubtask renders a single subtask from its view model
-func (p *Presentation) RenderSubtask(w io.Writer, view SubtaskView) error {
+func (p *Renderer) RenderSubtask(w io.Writer, view SubtaskView) error {
 	return p.tmpl.ExecuteTemplate(w, "subtask.html", view)
 }
 
 // RenderSubtaskDetails renders the subtask details slideover
-func (p *Presentation) RenderSubtaskDetails(w io.Writer, view SubtaskView) error {
+func (p *Renderer) RenderSubtaskDetails(w io.Writer, view SubtaskView) error {
 	return p.tmpl.ExecuteTemplate(w, "subtask_details", view)
 }
