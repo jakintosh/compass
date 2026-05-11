@@ -28,6 +28,27 @@ make run
 
 The application will be available at `http://localhost:8080`.
 
+For local development without a Consent server, run Compass in dev auth mode:
+
+```bash
+go run ./cmd/compass --dev
+```
+
+For a production Consent integration, register this app from its well-known
+manifest at `https://your-compass-host/.well-known/consent-integration`, then
+start Compass with:
+
+```bash
+CONSENT_URL=https://consent.example.com \
+CONSENT_PUBKEY="$(cat /path/to/consent/public.pem)" \
+PUBLIC_URL=https://your-compass-host \
+CONSENT_INTEGRATION=compass \
+go run ./cmd/compass
+```
+
+`PUBLIC_URL` is used to publish the manifest, callback URL, logo URL, and JWT
+audience. The default integration name is `compass`.
+
 ## Usage
 
 1. **Create a category** using the "New Category +" button in the header

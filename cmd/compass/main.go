@@ -10,13 +10,15 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
+	"strings"
 
+	"git.sr.ht/~jakintosh/compass/internal/store"
+	"git.sr.ht/~jakintosh/compass/internal/web"
 	"git.sr.ht/~jakintosh/consent/pkg/client"
 	contesting "git.sr.ht/~jakintosh/consent/pkg/testing"
 	"git.sr.ht/~jakintosh/consent/pkg/tokens"
-	"git.sr.ht/~jakintosh/compass/internal/store"
-	"git.sr.ht/~jakintosh/compass/internal/web"
 )
 
 // getConfigValue returns the CLI flag value if set, otherwise falls back to env var.
@@ -32,13 +34,22 @@ func main() {
 	devMode := flag.Bool("dev", false, "Run in dev mode (no consent server needed)")
 	consentURL := flag.String("consent-url", "", "Consent server URL (env: CONSENT_URL)")
 	consentPubkey := flag.String("consent-pubkey", "", "Consent server public key PEM (env: CONSENT_PUBKEY)")
-	appID := flag.String("app-id", "", "Application identifier/audience (env: APP_ID)")
+	integrationName := flag.String("integration-name", "", "Consent integration name (env: CONSENT_INTEGRATION, default: compass)")
+	publicURL := flag.String("public-url", "", "Public base URL for this Compass instance (env: PUBLIC_URL)")
+	appID := flag.String("app-id", "", "Deprecated alias for --integration-name when --integration-name is unset (env: APP_ID)")
 	flag.Parse()
 
 	// Resolve config with CLI > env fallback
 	resolvedConsentURL := getConfigValue(*consentURL, "CONSENT_URL")
 	resolvedConsentPubkey := getConfigValue(*consentPubkey, "CONSENT_PUBKEY")
-	resolvedAppID := getConfigValue(*appID, "APP_ID")
+	resolvedIntegrationName := getConfigValue(*integrationName, "CONSENT_INTEGRATION")
+	if resolvedIntegrationName == "" {
+		resolvedIntegrationName = getConfigValue(*appID, "APP_ID")
+	}
+	if resolvedIntegrationName == "" {
+		resolvedIntegrationName = "compass"
+	}
+	resolvedPublicURL := getConfigValue(*publicURL, "PUBLIC_URL")
 
 	// Initialize Store
 	store, err := store.NewSQLiteStore("compass.db", true)
@@ -70,8 +81,8 @@ func main() {
 		}
 	} else {
 		// Production mode: real consent server
-		if resolvedConsentURL == "" || resolvedConsentPubkey == "" || resolvedAppID == "" {
-			log.Fatalf("Production mode requires --consent-url, --consent-pubkey, and --app-id (or use --dev for development)")
+		if resolvedConsentURL == "" || resolvedConsentPubkey == "" || resolvedPublicURL == "" {
+			log.Fatalf("Production mode requires --consent-url, --consent-pubkey, and --public-url (or use --dev for development)")
 		}
 
 		pubKey, err := parsePublicKey(resolvedConsentPubkey)
@@ -79,19 +90,44 @@ func main() {
 			log.Fatalf("Failed to parse consent public key: %v", err)
 		}
 
-		validator := tokens.InitClient(pubKey, resolvedConsentURL, resolvedAppID)
-		authClient := client.Init(validator, resolvedConsentURL)
+		normalizedConsentURL, consentIssuer, err := normalizeConsentURL(resolvedConsentURL)
+		if err != nil {
+			log.Fatalf("Invalid consent URL: %v", err)
+		}
 
-		// TODO: Construct proper authorize URL with client_id, redirect_uri params
-		loginURL := resolvedConsentURL + "/authorize"
-		logoutURL := resolvedConsentURL + "/logout"
+		appConfig, err := buildProductionAppConfig(resolvedPublicURL)
+		if err != nil {
+			log.Fatalf("Invalid public URL: %v", err)
+		}
+
+		validator := tokens.InitClient(tokens.ClientOptions{
+			VerificationKey: pubKey,
+			IssuerDomain:    consentIssuer,
+			ValidAudience:   appConfig.audience,
+		})
+		authClient := client.Init(validator, normalizedConsentURL)
+
+		loginURL := buildAuthorizeURL(normalizedConsentURL, resolvedIntegrationName)
+		logoutURL := "/auth/logout"
+		manifest := client.IntegrationManifest{
+			Name:           resolvedIntegrationName,
+			Display:        "Compass",
+			Audience:       appConfig.audience,
+			Redirect:       appConfig.callbackURL,
+			Homepage:       appConfig.homepage,
+			Logo:           appConfig.logoURL,
+			ConsentIssuer:  consentIssuer,
+			ConsentBaseURL: normalizedConsentURL,
+		}
 
 		authConfig = web.AuthConfig{
 			Verifier:  authClient,
 			LoginURL:  loginURL,
 			LogoutURL: logoutURL,
 			Routes: map[string]http.HandlerFunc{
-				"/auth/callback": authClient.HandleAuthorizationCode(),
+				"/auth/callback":               authClient.HandleAuthorizationCode(),
+				"/auth/logout":                 authClient.HandleLogout(),
+				client.IntegrationManifestPath: client.HandleIntegrationManifest(manifest),
 			},
 		}
 	}
@@ -108,10 +144,74 @@ func main() {
 		log.Println("  → Visit /dev/login to authenticate as 'alice'")
 	} else {
 		log.Println("Starting server in PRODUCTION mode on :8080...")
+		log.Printf("  → Consent integration manifest: %s", client.IntegrationManifestPath)
 	}
 	if err := http.ListenAndServe(":8080", srv); err != nil {
 		log.Fatalf("Server failed: %v", err)
 	}
+}
+
+type productionAppConfig struct {
+	audience    string
+	callbackURL string
+	homepage    string
+	logoURL     string
+}
+
+func normalizeConsentURL(raw string) (baseURL string, issuerDomain string, err error) {
+	parsed, err := parseAbsoluteURL(raw)
+	if err != nil {
+		return "", "", err
+	}
+	if parsed.Path != "" && parsed.Path != "/" {
+		return "", "", fmt.Errorf("path is not allowed")
+	}
+	return (&url.URL{Scheme: parsed.Scheme, Host: parsed.Host}).String(), parsed.Host, nil
+}
+
+func buildProductionAppConfig(rawPublicURL string) (productionAppConfig, error) {
+	parsed, err := parseAbsoluteURL(rawPublicURL)
+	if err != nil {
+		return productionAppConfig{}, err
+	}
+
+	basePath := strings.TrimRight(parsed.Path, "/")
+	homepage := (&url.URL{Scheme: parsed.Scheme, Host: parsed.Host, Path: basePath}).String()
+	callbackURL := (&url.URL{Scheme: parsed.Scheme, Host: parsed.Host, Path: basePath + "/auth/callback"}).String()
+	logoURL := (&url.URL{Scheme: parsed.Scheme, Host: parsed.Host, Path: basePath + "/static/consent-logo.svg"}).String()
+
+	return productionAppConfig{
+		audience:    parsed.Host,
+		callbackURL: callbackURL,
+		homepage:    homepage,
+		logoURL:     logoURL,
+	}, nil
+}
+
+func parseAbsoluteURL(raw string) (*url.URL, error) {
+	parsed, err := url.Parse(strings.TrimSpace(raw))
+	if err != nil || parsed == nil {
+		return nil, fmt.Errorf("expected absolute URL with scheme and host")
+	}
+	if parsed.Scheme == "" || parsed.Host == "" {
+		return nil, fmt.Errorf("expected absolute URL with scheme and host")
+	}
+	if parsed.RawQuery != "" || parsed.Fragment != "" {
+		return nil, fmt.Errorf("query and fragment are not allowed")
+	}
+	return parsed, nil
+}
+
+func buildAuthorizeURL(consentURL string, integrationName string) string {
+	authorizeURL, err := url.Parse(strings.TrimRight(consentURL, "/") + "/authorize")
+	if err != nil {
+		return "/"
+	}
+	query := authorizeURL.Query()
+	query.Set("integration", integrationName)
+	query.Add("scope", "identity")
+	authorizeURL.RawQuery = query.Encode()
+	return authorizeURL.String()
 }
 
 // parsePublicKey parses a PEM-encoded ECDSA public key.

@@ -14,7 +14,7 @@
             <div class="auth-section">
                 {{if .IsAuthenticated}}
                 <span class="user-handle">{{.Handle}}</span>
-                <a href="{{.LogoutURL}}" class="btn btn-link">Logout</a>
+                <a href="{{.LogoutURL}}?csrf={{.CSRFToken}}" class="btn btn-link">Logout</a>
                 {{else}}
                 <a href="{{.LoginURL}}" class="btn btn-link">Login</a>
                 {{end}}
