@@ -4,8 +4,8 @@
         <h1 class="app-title">In Progress</h1>
 
         <div class="header-actions">
-            {{if .IsAuthenticated}}
-            <button class="btn btn-add" hx-post="/categories?csrf={{.CSRFToken}}" hx-target="#categories-list" hx-swap="afterbegin">
+            {{if .CanWrite}}
+            <button class="btn btn-add" hx-post="{{.BasePath}}/categories?csrf={{.CSRFToken}}" hx-target="#categories-list" hx-swap="afterbegin">
                 <span>New Category</span>
                 <span class="arrow">+</span>
             </button>
@@ -13,7 +13,7 @@
 
             <div class="auth-section">
                 {{if .IsAuthenticated}}
-                <span class="user-handle">{{.Handle}}</span>
+                <a class="user-handle" href="/{{.Handle}}/">{{.Handle}}</a>
                 <a href="{{.LogoutURL}}?csrf={{.CSRFToken}}" class="btn btn-link">Logout</a>
                 {{else}}
                 <a href="{{.LoginURL}}" class="btn btn-link">Login</a>

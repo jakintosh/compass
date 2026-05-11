@@ -47,7 +47,10 @@ go run ./cmd/compass
 ```
 
 `PUBLIC_URL` is used to publish the manifest, callback URL, logo URL, and JWT
-audience. The default integration name is `compass`.
+audience. The login URL requests the `identity` and `profile` Consent scopes so
+Compass can cache each user's handle for tenant URLs like
+`https://your-compass-host/{handle}/`. The default integration name is
+`compass`.
 
 ## Usage
 

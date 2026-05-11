@@ -40,7 +40,7 @@ func NewCategoryView(c *domain.Category, oob bool, auth AuthContext) CategoryVie
 	}
 
 	view.DeleteButton = DeleteButtonView{
-		URL:            "/categories/" + c.ID + "?csrf=" + auth.CSRFToken,
+		URL:            auth.BasePath + "/categories/" + c.ID + "?csrf=" + auth.CSRFToken,
 		ConfirmMessage: "Delete this category and all its tasks?",
 		ButtonText:     "Delete Category",
 	}

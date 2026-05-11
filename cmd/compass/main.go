@@ -21,6 +21,8 @@ import (
 	"git.sr.ht/~jakintosh/consent/pkg/tokens"
 )
 
+var consentScopes = []string{"identity", "profile"}
+
 // getConfigValue returns the CLI flag value if set, otherwise falls back to env var.
 func getConfigValue(flagVal, envKey string) string {
 	if flagVal != "" {
@@ -68,6 +70,7 @@ func main() {
 		}
 
 		env := contesting.NewTestEnvWithKey(key, "localhost", "compass-dev")
+		env.Scopes = consentScopes
 		tv := contesting.NewTestVerifierWithEnv(env)
 
 		authConfig = web.AuthConfig{
@@ -121,9 +124,10 @@ func main() {
 		}
 
 		authConfig = web.AuthConfig{
-			Verifier:  authClient,
-			LoginURL:  loginURL,
-			LogoutURL: logoutURL,
+			Verifier:       authClient,
+			ProfileFetcher: authClient,
+			LoginURL:       loginURL,
+			LogoutURL:      logoutURL,
 			Routes: map[string]http.HandlerFunc{
 				"/auth/callback":               authClient.HandleAuthorizationCode(),
 				"/auth/logout":                 authClient.HandleLogout(),
@@ -209,7 +213,9 @@ func buildAuthorizeURL(consentURL string, integrationName string) string {
 	}
 	query := authorizeURL.Query()
 	query.Set("integration", integrationName)
-	query.Add("scope", "identity")
+	for _, scope := range consentScopes {
+		query.Add("scope", scope)
+	}
 	authorizeURL.RawQuery = query.Encode()
 	return authorizeURL.String()
 }

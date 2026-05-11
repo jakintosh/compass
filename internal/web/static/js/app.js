@@ -13,6 +13,11 @@ function withCsrf(values) {
   return values;
 }
 
+function appURL(path) {
+  const basePath = document.body ? document.body.dataset.basePath || "" : "";
+  return basePath + path;
+}
+
 document.addEventListener("htmx:load", function (evt) {
   if (window._hyperscript && window._hyperscript.processNode) {
     const target = evt.detail && evt.detail.elt ? evt.detail.elt : evt.target;
@@ -31,7 +36,7 @@ document.addEventListener("htmx:load", function (evt) {
       ghostClass: "ghost",
       onEnd: function () {
         let ids = this.toArray();
-        htmx.ajax("POST", "/categories/reorder", {
+        htmx.ajax("POST", appURL("/categories/reorder"), {
           values: withCsrf({ id: ids }),
           swap: "none",
         });
@@ -55,7 +60,7 @@ document.addEventListener("htmx:load", function (evt) {
             ids.push(item.getAttribute("data-id"));
           });
 
-          htmx.ajax("POST", "/tasks/reorder", {
+          htmx.ajax("POST", appURL("/tasks/reorder"), {
             values: withCsrf({
               category_id: catId,
               id: ids,
@@ -84,7 +89,7 @@ document.addEventListener("htmx:load", function (evt) {
             ids.push(item.getAttribute("data-id"));
           });
 
-          htmx.ajax("POST", "/subtasks/reorder", {
+          htmx.ajax("POST", appURL("/subtasks/reorder"), {
             values: withCsrf({
               task_id: taskId,
               id: ids,

@@ -8,7 +8,7 @@
 
 <li class="category" id="category-{{.ID}}" data-id="{{.ID}}" data-ui-key="ui.category.{{.ID}}.collapsed" data-ui-class="collapsed" {{if .OOB}}hx-swap-oob="true"{{end}}>
     <div class="row category-header">
-        {{if .IsAuthenticated}}
+        {{if .CanWrite}}
         <!-- Drag handle -->
         <div class="drag-handle hover-reveal">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -34,7 +34,7 @@
             </svg>
         </button>
 
-        <div class="row-content" hx-get="/categories/{{.ID}}/details" hx-target="#slideover-container" hx-swap="innerHTML">
+        <div class="row-content" hx-get="{{.BasePath}}/categories/{{.ID}}/details" hx-target="#slideover-container" hx-swap="innerHTML">
             <div class="category-info">
                 <div class="category-title-row">
                     <h2 class="category-name">{{.Name}}</h2>
@@ -52,9 +52,9 @@
     <ul class="tasks-list" id="tasks-list-{{.ID}}" data-category-id="{{.ID}}">
         {{range .Tasks}} {{template "task.html" .}} {{end}}
 
-        {{if .IsAuthenticated}}
+        {{if .CanWrite}}
         <li class="row add-item">
-            <button class="btn btn-add" hx-post="/categories/{{.ID}}/tasks?csrf={{.CSRFToken}}" hx-target="closest li" hx-swap="beforebegin">
+            <button class="btn btn-add" hx-post="{{.BasePath}}/categories/{{.ID}}/tasks?csrf={{.CSRFToken}}" hx-target="closest li" hx-swap="beforebegin">
                 <span class="arrow">→</span>
                 <span>Add a task</span>
             </button>

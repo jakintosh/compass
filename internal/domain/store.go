@@ -3,28 +3,32 @@ package domain
 import "time"
 
 type Store interface {
-	GetCategories() ([]*Category, error)
-	GetCategory(id string) (*Category, error)
-	AddCategory(name string) (*Category, error)
-	UpdateCategory(cat *Category) (*Category, error)
-	DeleteCategory(id string) (*Category, error)
-	ReorderCategories(ids []string) error
+	GetAccountByHandle(handle string) (*Account, error)
+	GetAccountBySubject(subject string) (*Account, error)
+	UpsertAccount(subject string, handle string, refreshedAt time.Time) (*Account, error)
 
-	GetTask(id string) (*Task, error)
-	AddTask(catID string, name string) (*Task, error)
-	UpdateTask(task *Task) (*Task, error)
-	DeleteTask(id string) (*Task, error)
-	ReorderTasks(catID string, taskIDs []string) error
+	GetCategories(accountID string) ([]*Category, error)
+	GetCategory(accountID string, id string) (*Category, error)
+	AddCategory(accountID string, name string) (*Category, error)
+	UpdateCategory(accountID string, cat *Category) (*Category, error)
+	DeleteCategory(accountID string, id string) (*Category, error)
+	ReorderCategories(accountID string, ids []string) error
 
-	GetSubtask(id string) (*Subtask, error)
-	AddSubtask(taskID string, name string) (*Subtask, error)
-	UpdateSubtask(sub *Subtask) (*Subtask, error)
-	DeleteSubtask(id string) (*Subtask, error)
-	ReorderSubtasks(taskID string, subIDs []string) error
+	GetTask(accountID string, id string) (*Task, error)
+	AddTask(accountID string, catID string, name string) (*Task, error)
+	UpdateTask(accountID string, task *Task) (*Task, error)
+	DeleteTask(accountID string, id string) (*Task, error)
+	ReorderTasks(accountID string, catID string, taskIDs []string) error
 
-	AddWorkLogForTask(taskID string, hoursWorked float64, workDescription string, completionEstimate int, customTime *time.Time) (*WorkLog, error)
-	AddWorkLogForSubtask(subtaskID string, hoursWorked float64, workDescription string, completionEstimate int, customTime *time.Time) (*WorkLog, error)
-	GetWorkLogsForSubtask(subtaskID string) ([]*WorkLog, error)
-	GetWorkLogsForTask(taskID string) ([]*WorkLog, error)
-	GetWorkLogsForCategory(categoryID string) ([]*WorkLog, error)
+	GetSubtask(accountID string, id string) (*Subtask, error)
+	AddSubtask(accountID string, taskID string, name string) (*Subtask, error)
+	UpdateSubtask(accountID string, sub *Subtask) (*Subtask, error)
+	DeleteSubtask(accountID string, id string) (*Subtask, error)
+	ReorderSubtasks(accountID string, taskID string, subIDs []string) error
+
+	AddWorkLogForTask(accountID string, taskID string, hoursWorked float64, workDescription string, completionEstimate int, customTime *time.Time) (*WorkLog, error)
+	AddWorkLogForSubtask(accountID string, subtaskID string, hoursWorked float64, workDescription string, completionEstimate int, customTime *time.Time) (*WorkLog, error)
+	GetWorkLogsForSubtask(accountID string, subtaskID string) ([]*WorkLog, error)
+	GetWorkLogsForTask(accountID string, taskID string) ([]*WorkLog, error)
+	GetWorkLogsForCategory(accountID string, categoryID string) ([]*WorkLog, error)
 }

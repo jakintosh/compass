@@ -12,16 +12,16 @@
     </div>
 
     <div class="slideover-body">
-        {{if .IsAuthenticated}}
-        <form class="form-field" hx-patch="/subtasks/{{.ID}}?csrf={{.CSRFToken}}" hx-trigger="change" hx-swap="none">
+        {{if .CanWrite}}
+        <form class="form-field" hx-patch="{{.BasePath}}/subtasks/{{.ID}}?csrf={{.CSRFToken}}" hx-trigger="change" hx-swap="none">
             <label class="field-label">Name</label>
             <input type="text" value="{{.Name}}" class="field-input" name="name" _="on keydown[key is 'Enter'] blur() me">
         </form>
-        <form class="form-field" hx-patch="/subtasks/{{.ID}}?csrf={{.CSRFToken}}" hx-trigger="change" hx-swap="none">
+        <form class="form-field" hx-patch="{{.BasePath}}/subtasks/{{.ID}}?csrf={{.CSRFToken}}" hx-trigger="change" hx-swap="none">
             <label class="field-label">Description</label>
             <textarea rows="3" class="field-textarea" placeholder="Add a description..." name="description">{{.Description}}</textarea>
         </form>
-        <form class="form-field" hx-patch="/subtasks/{{.ID}}?csrf={{.CSRFToken}}" hx-trigger="change" hx-swap="none">
+        <form class="form-field" hx-patch="{{.BasePath}}/subtasks/{{.ID}}?csrf={{.CSRFToken}}" hx-trigger="change" hx-swap="none">
             <label class="toggle-switch-label">
                 <span class="toggle-switch-text">Public{{if not .ParentPublic}} (parent is private){{end}}</span>
                 <input type="checkbox" name="public" class="toggle-switch-input"
@@ -34,7 +34,7 @@
         <div class="work-log-section">
             <h3 class="section-title">Work Log</h3>
 
-            <form class="work-log-form" hx-post="/subtasks/{{.ID}}/work-logs?csrf={{.CSRFToken}}" hx-swap="none" _="
+            <form class="work-log-form" hx-post="{{.BasePath}}/subtasks/{{.ID}}/work-logs?csrf={{.CSRFToken}}" hx-swap="none" _="
                     on htmx:afterRequest
                         reset() me
                         remove .open from .form-expandable in me

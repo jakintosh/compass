@@ -10,10 +10,14 @@ import (
 // AuthContext carries authentication state through view models
 type AuthContext struct {
 	IsAuthenticated bool
-	Handle          string // Username from access token Subject()
+	CanWrite        bool
+	Subject         string // Stable opaque Consent subject
+	AccountID       string // Local Compass account ID
+	Handle          string // Consent profile handle
 	CSRFToken       string // For CSRF protection on forms
 	LoginURL        string // Where login button should link
 	LogoutURL       string // Where logout button should link
+	BasePath        string // Tenant route prefix, e.g. /alice
 }
 
 type PageView struct {

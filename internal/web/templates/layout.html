@@ -23,7 +23,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
 </head>
 
-<body>
+<body data-base-path="{{.BasePath}}">
     {{template "content" .}} {{template "slideover_container" .}}
 
     <script src="/static/js/app.js"></script>

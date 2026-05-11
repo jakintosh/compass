@@ -24,7 +24,7 @@ func TestBuildProductionAppConfig(t *testing.T) {
 
 func TestBuildAuthorizeURL(t *testing.T) {
 	got := buildAuthorizeURL("https://consent.example.com", "compass")
-	want := "https://consent.example.com/authorize?integration=compass&scope=identity"
+	want := "https://consent.example.com/authorize?integration=compass&scope=identity&scope=profile"
 	if got != want {
 		t.Fatalf("buildAuthorizeURL = %q, want %q", got, want)
 	}
