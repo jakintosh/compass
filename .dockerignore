@@ -1,0 +1,9 @@
+.git
+.gitignore
+
+bin
+compass.db
+dev.key
+
+Dockerfile
+README.md
