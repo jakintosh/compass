@@ -31,7 +31,7 @@ The application will be available at `http://localhost:8080`.
 For local development without a Consent server, run Compass in dev auth mode:
 
 ```bash
-go run ./cmd/compass --dev
+go run ./cmd/compass serve --dev
 ```
 
 For a production Consent integration, register this app from its well-known
@@ -43,7 +43,7 @@ CONSENT_URL=https://consent.example.com \
 CONSENT_PUBKEY="$(cat /path/to/consent/public.pem)" \
 PUBLIC_URL=https://your-compass-host \
 CONSENT_INTEGRATION=compass \
-go run ./cmd/compass
+go run ./cmd/compass serve
 ```
 
 `PUBLIC_URL` is used to publish the manifest, callback URL, logo URL, and JWT

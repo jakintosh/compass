@@ -3,13 +3,13 @@ module git.sr.ht/~jakintosh/compass
 go 1.25.4
 
 require (
+	git.sr.ht/~jakintosh/command-go v0.5.0
 	git.sr.ht/~jakintosh/consent v0.3.0
 	github.com/google/uuid v1.6.0
 	modernc.org/sqlite v1.44.1
 )
 
 require (
-	git.sr.ht/~jakintosh/command-go v0.5.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/ncruces/go-strftime v1.0.0 // indirect

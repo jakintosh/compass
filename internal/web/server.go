@@ -106,7 +106,9 @@ func (s *Server) handleTenantRoute(
 	w http.ResponseWriter,
 	r *http.Request,
 ) {
-	segments := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
+	path := r.URL.Path
+	path = strings.Trim(path, "/")
+	segments := strings.Split(path, "/")
 	if len(segments) == 0 || segments[0] == "" {
 		http.NotFound(w, r)
 		return

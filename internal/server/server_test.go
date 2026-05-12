@@ -1,4 +1,4 @@
-package main
+package server
 
 import "testing"
 
@@ -18,6 +18,23 @@ func TestBuildProductionAppConfig(t *testing.T) {
 		t.Fatalf("homepage = %q", cfg.homepage)
 	}
 	if cfg.logoURL != "https://compass.example.com/static/consent-logo.svg" {
+		t.Fatalf("logoURL = %q", cfg.logoURL)
+	}
+}
+
+func TestBuildProductionAppConfigWithBasePath(t *testing.T) {
+	cfg, err := buildProductionAppConfig("https://compass.example.com/tools/compass/")
+	if err != nil {
+		t.Fatalf("buildProductionAppConfig returned error: %v", err)
+	}
+
+	if cfg.callbackURL != "https://compass.example.com/tools/compass/auth/callback" {
+		t.Fatalf("callbackURL = %q", cfg.callbackURL)
+	}
+	if cfg.homepage != "https://compass.example.com/tools/compass" {
+		t.Fatalf("homepage = %q", cfg.homepage)
+	}
+	if cfg.logoURL != "https://compass.example.com/tools/compass/static/consent-logo.svg" {
 		t.Fatalf("logoURL = %q", cfg.logoURL)
 	}
 }

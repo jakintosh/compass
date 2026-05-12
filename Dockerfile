@@ -18,3 +18,4 @@ COPY internal/web/static /app/internal/web/static
 
 EXPOSE 8080
 ENTRYPOINT ["/app/compass"]
+CMD ["serve"]

@@ -14,7 +14,7 @@ test: build
 # Run the application
 run: build
 	@echo "Running compass..."
-	@./bin/compass --dev
+	@./bin/compass serve --dev
 
 # Clean build artifacts
 clean:
