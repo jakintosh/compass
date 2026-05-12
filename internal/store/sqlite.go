@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"git.sr.ht/~jakintosh/compass/internal/domain"
+	"git.sr.ht/~jakintosh/compass/internal/service"
 	"github.com/google/uuid"
 	_ "modernc.org/sqlite"
 )
@@ -16,7 +16,15 @@ type SQLiteStore struct {
 	db *sql.DB
 }
 
-func NewSQLiteStore(path string, wal bool) (*SQLiteStore, error) {
+var _ service.Store = (*SQLiteStore)(nil)
+
+func NewSQLiteStore(
+	path string,
+	wal bool,
+) (
+	*SQLiteStore,
+	error,
+) {
 	const busyTimeoutMS = 5000
 
 	db, err := sql.Open("sqlite", path)
@@ -149,8 +157,13 @@ func (s *SQLiteStore) migrate() error {
 	return nil
 }
 
-func scanAccount(row *sql.Row) (*domain.Account, error) {
-	var account domain.Account
+func scanAccount(
+	row *sql.Row,
+) (
+	*service.Account,
+	error,
+) {
+	var account service.Account
 	var profileRefreshedAt int64
 	var createdAt int64
 	var updatedAt int64
@@ -170,7 +183,12 @@ func scanAccount(row *sql.Row) (*domain.Account, error) {
 	return &account, nil
 }
 
-func (s *SQLiteStore) GetAccountByHandle(handle string) (*domain.Account, error) {
+func (s *SQLiteStore) GetAccountByHandle(
+	handle string,
+) (
+	*service.Account,
+	error,
+) {
 	return scanAccount(s.db.QueryRow(`
 		SELECT id, consent_subject, handle, profile_refreshed_at, created_at, updated_at
 		FROM accounts
@@ -179,7 +197,12 @@ func (s *SQLiteStore) GetAccountByHandle(handle string) (*domain.Account, error)
 	))
 }
 
-func (s *SQLiteStore) GetAccountBySubject(subject string) (*domain.Account, error) {
+func (s *SQLiteStore) GetAccountBySubject(
+	subject string,
+) (
+	*service.Account,
+	error,
+) {
 	return scanAccount(s.db.QueryRow(`
 		SELECT id, consent_subject, handle, profile_refreshed_at, created_at, updated_at
 		FROM accounts
@@ -188,7 +211,14 @@ func (s *SQLiteStore) GetAccountBySubject(subject string) (*domain.Account, erro
 	))
 }
 
-func (s *SQLiteStore) UpsertAccount(subject string, handle string, refreshedAt time.Time) (*domain.Account, error) {
+func (s *SQLiteStore) UpsertAccount(
+	subject string,
+	handle string,
+	refreshedAt time.Time,
+) (
+	*service.Account,
+	error,
+) {
 	id := uuid.NewString()
 	now := time.Now().Unix()
 	refreshed := refreshedAt.Unix()
@@ -208,7 +238,12 @@ func (s *SQLiteStore) UpsertAccount(subject string, handle string, refreshedAt t
 	))
 }
 
-func (s *SQLiteStore) GetCategories(accountID string) ([]*domain.Category, error) {
+func (s *SQLiteStore) GetCategories(
+	accountID string,
+) (
+	[]*service.Category,
+	error,
+) {
 	// get all categories
 	categoryRows, err := s.db.Query(`
 		SELECT
@@ -225,9 +260,9 @@ func (s *SQLiteStore) GetCategories(accountID string) ([]*domain.Category, error
 		return nil, err
 	}
 
-	var categories []*domain.Category
+	var categories []*service.Category
 	for categoryRows.Next() {
-		var c domain.Category
+		var c service.Category
 		if err := categoryRows.Scan(
 			&c.ID,
 			&c.Name,
@@ -237,7 +272,7 @@ func (s *SQLiteStore) GetCategories(accountID string) ([]*domain.Category, error
 			categoryRows.Close()
 			return nil, err
 		}
-		c.Tasks = []*domain.Task{} // Initialize slice
+		c.Projects = []*service.Project{} // Initialize slice
 		categories = append(categories, &c)
 	}
 	if err := categoryRows.Err(); err != nil {
@@ -268,25 +303,25 @@ func (s *SQLiteStore) GetCategories(accountID string) ([]*domain.Category, error
 		return nil, err
 	}
 
-	tasksByCat := make(map[string][]*domain.Task)
-	var allTasks []*domain.Task
+	projectsByCat := make(map[string][]*service.Project)
+	var allProjects []*service.Project
 	for taskRows.Next() {
-		var t domain.Task
+		var p service.Project
 		if err := taskRows.Scan(
-			&t.ID,
-			&t.CategoryID,
-			&t.Name,
-			&t.Description,
-			&t.Completion,
-			&t.Public,
-			&t.ParentPublic,
+			&p.ID,
+			&p.CategoryID,
+			&p.Name,
+			&p.Description,
+			&p.Completion,
+			&p.Public,
+			&p.ParentPublic,
 		); err != nil {
 			taskRows.Close()
 			return nil, err
 		}
-		t.Subtasks = []*domain.Subtask{}
-		tasksByCat[t.CategoryID] = append(tasksByCat[t.CategoryID], &t)
-		allTasks = append(allTasks, &t)
+		p.Tasks = []*service.Task{}
+		projectsByCat[p.CategoryID] = append(projectsByCat[p.CategoryID], &p)
+		allProjects = append(allProjects, &p)
 	}
 	if err := taskRows.Err(); err != nil {
 		taskRows.Close()
@@ -296,7 +331,7 @@ func (s *SQLiteStore) GetCategories(accountID string) ([]*domain.Category, error
 		return nil, err
 	}
 
-	// get all subtasks with parent public from tasks and categories
+	// get all tasks with parent public from projects and categories
 	subRows, err := s.db.Query(`
 		SELECT
 			s.id,
@@ -318,12 +353,12 @@ func (s *SQLiteStore) GetCategories(accountID string) ([]*domain.Category, error
 		return nil, err
 	}
 
-	subsByTask := make(map[string][]*domain.Subtask)
+	subsByTask := make(map[string][]*service.Task)
 	for subRows.Next() {
-		var sub domain.Subtask
+		var sub service.Task
 		if err := subRows.Scan(
 			&sub.ID,
-			&sub.TaskID,
+			&sub.ProjectID,
 			&sub.CategoryID,
 			&sub.Name,
 			&sub.Description,
@@ -333,7 +368,7 @@ func (s *SQLiteStore) GetCategories(accountID string) ([]*domain.Category, error
 		); err != nil {
 			return nil, err
 		}
-		subsByTask[sub.TaskID] = append(subsByTask[sub.TaskID], &sub)
+		subsByTask[sub.ProjectID] = append(subsByTask[sub.ProjectID], &sub)
 	}
 	if err := subRows.Err(); err != nil {
 		subRows.Close()
@@ -344,23 +379,29 @@ func (s *SQLiteStore) GetCategories(accountID string) ([]*domain.Category, error
 	}
 
 	// Assemble
-	for _, t := range allTasks {
-		if subs, ok := subsByTask[t.ID]; ok {
-			t.Subtasks = subs
+	for _, p := range allProjects {
+		if subs, ok := subsByTask[p.ID]; ok {
+			p.Tasks = subs
 		}
 	}
 
 	for _, c := range categories {
-		if tasks, ok := tasksByCat[c.ID]; ok {
-			c.Tasks = tasks
+		if projects, ok := projectsByCat[c.ID]; ok {
+			c.Projects = projects
 		}
 	}
 
 	return categories, nil
 }
 
-func (s *SQLiteStore) GetCategory(accountID string, id string) (*domain.Category, error) {
-	var c domain.Category
+func (s *SQLiteStore) GetCategory(
+	accountID string,
+	id string,
+) (
+	*service.Category,
+	error,
+) {
+	var c service.Category
 	row := s.db.QueryRow(`
 		SELECT
 			id,
@@ -381,16 +422,22 @@ func (s *SQLiteStore) GetCategory(accountID string, id string) (*domain.Category
 		return nil, err
 	}
 
-	tasks, err := s.getTasksForCategory(accountID, c.ID)
+	projects, err := s.getProjectsForCategory(accountID, c.ID)
 	if err != nil {
 		return nil, err
 	}
 
-	c.Tasks = tasks
+	c.Projects = projects
 	return &c, nil
 }
 
-func (s *SQLiteStore) getTasksForCategory(accountID string, catID string) ([]*domain.Task, error) {
+func (s *SQLiteStore) getProjectsForCategory(
+	accountID string,
+	catID string,
+) (
+	[]*service.Project,
+	error,
+) {
 	taskRows, err := s.db.Query(`
 		SELECT
 			t.id,
@@ -411,23 +458,23 @@ func (s *SQLiteStore) getTasksForCategory(accountID string, catID string) ([]*do
 		return nil, err
 	}
 
-	var tasks []*domain.Task
+	var projects []*service.Project
 	for taskRows.Next() {
-		var t domain.Task
+		var p service.Project
 		if err := taskRows.Scan(
-			&t.ID,
-			&t.CategoryID,
-			&t.Name,
-			&t.Description,
-			&t.Completion,
-			&t.Public,
-			&t.ParentPublic,
+			&p.ID,
+			&p.CategoryID,
+			&p.Name,
+			&p.Description,
+			&p.Completion,
+			&p.Public,
+			&p.ParentPublic,
 		); err != nil {
 			taskRows.Close()
 			return nil, err
 		}
 
-		tasks = append(tasks, &t)
+		projects = append(projects, &p)
 	}
 	if err := taskRows.Err(); err != nil {
 		taskRows.Close()
@@ -437,17 +484,23 @@ func (s *SQLiteStore) getTasksForCategory(accountID string, catID string) ([]*do
 		return nil, err
 	}
 
-	for _, t := range tasks {
-		subs, err := s.getSubtasksForTask(accountID, t.ID)
+	for _, p := range projects {
+		tasks, err := s.getTasksForProject(accountID, p.ID)
 		if err != nil {
 			return nil, err
 		}
-		t.Subtasks = subs
+		p.Tasks = tasks
 	}
-	return tasks, nil
+	return projects, nil
 }
 
-func (s *SQLiteStore) getSubtasksForTask(accountID string, taskID string) ([]*domain.Subtask, error) {
+func (s *SQLiteStore) getTasksForProject(
+	accountID string,
+	projectID string,
+) (
+	[]*service.Task,
+	error,
+) {
 	subtaskRows, err := s.db.Query(`
 		SELECT
 			s.id,
@@ -464,19 +517,19 @@ func (s *SQLiteStore) getSubtasksForTask(accountID string, taskID string) ([]*do
 		WHERE s.account_id = ?1 AND s.task_id = ?2
 		ORDER BY s.sort_order ASC`,
 		accountID,
-		taskID,
+		projectID,
 	)
 	if err != nil {
 		return nil, err
 	}
 	defer subtaskRows.Close()
 
-	var subs []*domain.Subtask
+	var subs []*service.Task
 	for subtaskRows.Next() {
-		var sub domain.Subtask
+		var sub service.Task
 		if err := subtaskRows.Scan(
 			&sub.ID,
-			&sub.TaskID,
+			&sub.ProjectID,
 			&sub.CategoryID,
 			&sub.Name,
 			&sub.Description,
@@ -491,14 +544,20 @@ func (s *SQLiteStore) getSubtasksForTask(accountID string, taskID string) ([]*do
 	return subs, nil
 }
 
-func (s *SQLiteStore) AddCategory(accountID string, name string) (*domain.Category, error) {
+func (s *SQLiteStore) AddCategory(
+	accountID string,
+	name string,
+) (
+	*service.Category,
+	error,
+) {
 	id := uuid.NewString()
 
 	var minOrder sql.NullInt64
 	s.db.QueryRow("SELECT MIN(sort_order) FROM categories WHERE account_id = ?1", accountID).Scan(&minOrder)
 	order := int(minOrder.Int64) - 1
 
-	var cat domain.Category
+	var cat service.Category
 	if err := s.db.QueryRow(`
 		INSERT INTO categories (id, account_id, name, sort_order)
 		VALUES (?1, ?2, ?3, ?4)
@@ -520,12 +579,18 @@ func (s *SQLiteStore) AddCategory(accountID string, name string) (*domain.Catego
 		return nil, err
 	}
 
-	cat.Tasks = []*domain.Task{}
+	cat.Projects = []*service.Project{}
 	return &cat, nil
 }
 
-func (s *SQLiteStore) UpdateCategory(accountID string, cat *domain.Category) (*domain.Category, error) {
-	var updated domain.Category
+func (s *SQLiteStore) UpdateCategory(
+	accountID string,
+	cat *service.Category,
+) (
+	*service.Category,
+	error,
+) {
+	var updated service.Category
 	if err := s.db.QueryRow(
 		`UPDATE categories
 			SET name = ?1,
@@ -551,17 +616,23 @@ func (s *SQLiteStore) UpdateCategory(accountID string, cat *domain.Category) (*d
 		return nil, err
 	}
 
-	tasks, err := s.getTasksForCategory(accountID, updated.ID)
+	projects, err := s.getProjectsForCategory(accountID, updated.ID)
 	if err != nil {
 		return nil, err
 	}
 
-	updated.Tasks = tasks
+	updated.Projects = projects
 	return &updated, nil
 }
 
-func (s *SQLiteStore) DeleteCategory(accountID string, id string) (*domain.Category, error) {
-	var removed domain.Category
+func (s *SQLiteStore) DeleteCategory(
+	accountID string,
+	id string,
+) (
+	*service.Category,
+	error,
+) {
+	var removed service.Category
 	if err := s.db.QueryRow(`
 		DELETE FROM categories
 		WHERE account_id = ?1 AND id = ?2
@@ -581,7 +652,10 @@ func (s *SQLiteStore) DeleteCategory(accountID string, id string) (*domain.Categ
 	return &removed, nil
 }
 
-func (s *SQLiteStore) ReorderCategories(accountID string, ids []string) error {
+func (s *SQLiteStore) ReorderCategories(
+	accountID string,
+	ids []string,
+) error {
 	tx, err := s.db.Begin()
 	if err != nil {
 		return err
@@ -603,8 +677,14 @@ func (s *SQLiteStore) ReorderCategories(accountID string, ids []string) error {
 	return tx.Commit()
 }
 
-func (s *SQLiteStore) GetTask(accountID string, id string) (*domain.Task, error) {
-	var t domain.Task
+func (s *SQLiteStore) GetProject(
+	accountID string,
+	id string,
+) (
+	*service.Project,
+	error,
+) {
+	var p service.Project
 	err := s.db.QueryRow(`
 		SELECT
 			t.id,
@@ -620,26 +700,33 @@ func (s *SQLiteStore) GetTask(accountID string, id string) (*domain.Task, error)
 		accountID,
 		id,
 	).Scan(
-		&t.ID,
-		&t.CategoryID,
-		&t.Name,
-		&t.Description,
-		&t.Completion,
-		&t.Public,
-		&t.ParentPublic,
+		&p.ID,
+		&p.CategoryID,
+		&p.Name,
+		&p.Description,
+		&p.Completion,
+		&p.Public,
+		&p.ParentPublic,
 	)
 	if err != nil {
 		return nil, err
 	}
-	subs, err := s.getSubtasksForTask(accountID, t.ID)
+	tasks, err := s.getTasksForProject(accountID, p.ID)
 	if err != nil {
 		return nil, err
 	}
-	t.Subtasks = subs
-	return &t, nil
+	p.Tasks = tasks
+	return &p, nil
 }
 
-func (s *SQLiteStore) AddTask(accountID string, catID string, name string) (*domain.Task, error) {
+func (s *SQLiteStore) AddProject(
+	accountID string,
+	catID string,
+	name string,
+) (
+	*service.Project,
+	error,
+) {
 	id := uuid.NewString()
 
 	var maxOrder sql.NullInt64
@@ -652,7 +739,7 @@ func (s *SQLiteStore) AddTask(accountID string, catID string, name string) (*dom
 	).Scan(&maxOrder)
 	order := int(maxOrder.Int64) + 1
 
-	var task domain.Task
+	var project service.Project
 	if err := s.db.QueryRow(`
 		INSERT INTO tasks (id, account_id, category_id, name, sort_order)
 		SELECT ?1, ?2, id, ?4, ?5
@@ -671,22 +758,28 @@ func (s *SQLiteStore) AddTask(accountID string, catID string, name string) (*dom
 		name,
 		order,
 	).Scan(
-		&task.ID,
-		&task.CategoryID,
-		&task.Name,
-		&task.Description,
-		&task.Completion,
-		&task.Public,
+		&project.ID,
+		&project.CategoryID,
+		&project.Name,
+		&project.Description,
+		&project.Completion,
+		&project.Public,
 	); err != nil {
 		return nil, err
 	}
 
-	task.Subtasks = []*domain.Subtask{}
-	return &task, nil
+	project.Tasks = []*service.Task{}
+	return &project, nil
 }
 
-func (s *SQLiteStore) UpdateTask(accountID string, task *domain.Task) (*domain.Task, error) {
-	var updated domain.Task
+func (s *SQLiteStore) UpdateProject(
+	accountID string,
+	project *service.Project,
+) (
+	*service.Project,
+	error,
+) {
+	var updated service.Project
 	if err := s.db.QueryRow(`
 		UPDATE tasks
 		SET name = ?1,
@@ -701,12 +794,12 @@ func (s *SQLiteStore) UpdateTask(accountID string, task *domain.Task) (*domain.T
 			description,
 			completion,
 			public`,
-		task.Name,
-		task.Description,
-		task.Completion,
-		task.Public,
+		project.Name,
+		project.Description,
+		project.Completion,
+		project.Public,
 		accountID,
-		task.ID,
+		project.ID,
 	).Scan(
 		&updated.ID,
 		&updated.CategoryID,
@@ -717,12 +810,18 @@ func (s *SQLiteStore) UpdateTask(accountID string, task *domain.Task) (*domain.T
 	); err != nil {
 		return nil, err
 	}
-	updated.Subtasks = task.Subtasks
+	updated.Tasks = project.Tasks
 	return &updated, nil
 }
 
-func (s *SQLiteStore) DeleteTask(accountID string, id string) (*domain.Task, error) {
-	var removed domain.Task
+func (s *SQLiteStore) DeleteProject(
+	accountID string,
+	id string,
+) (
+	*service.Project,
+	error,
+) {
+	var removed service.Project
 	if err := s.db.QueryRow(`
 		DELETE FROM tasks
 		WHERE account_id = ?1 AND id = ?2
@@ -749,7 +848,11 @@ func (s *SQLiteStore) DeleteTask(accountID string, id string) (*domain.Task, err
 	return &removed, nil
 }
 
-func (s *SQLiteStore) ReorderTasks(accountID string, catID string, taskIDs []string) error {
+func (s *SQLiteStore) ReorderProjects(
+	accountID string,
+	catID string,
+	taskIDs []string,
+) error {
 	tx, err := s.db.Begin()
 	if err != nil {
 		return err
@@ -772,8 +875,14 @@ func (s *SQLiteStore) ReorderTasks(accountID string, catID string, taskIDs []str
 	return tx.Commit()
 }
 
-func (s *SQLiteStore) GetSubtask(accountID string, id string) (*domain.Subtask, error) {
-	var sub domain.Subtask
+func (s *SQLiteStore) GetTask(
+	accountID string,
+	id string,
+) (
+	*service.Task,
+	error,
+) {
+	var sub service.Task
 	err := s.db.QueryRow(
 		`SELECT
 			s.id,
@@ -792,7 +901,7 @@ func (s *SQLiteStore) GetSubtask(accountID string, id string) (*domain.Subtask, 
 		id,
 	).Scan(
 		&sub.ID,
-		&sub.TaskID,
+		&sub.ProjectID,
 		&sub.CategoryID,
 		&sub.Name,
 		&sub.Description,
@@ -806,7 +915,14 @@ func (s *SQLiteStore) GetSubtask(accountID string, id string) (*domain.Subtask, 
 	return &sub, nil
 }
 
-func (s *SQLiteStore) AddSubtask(accountID string, taskID string, name string) (*domain.Subtask, error) {
+func (s *SQLiteStore) AddTask(
+	accountID string,
+	projectID string,
+	name string,
+) (
+	*service.Task,
+	error,
+) {
 	id := uuid.NewString()
 
 	tx, err := s.db.Begin()
@@ -821,13 +937,13 @@ func (s *SQLiteStore) AddSubtask(accountID string, taskID string, name string) (
 		FROM subtasks
 		WHERE account_id = ?1 AND task_id = ?2`,
 		accountID,
-		taskID,
+		projectID,
 	).Scan(&maxOrder); err != nil {
 		return nil, err
 	}
 	order := int(maxOrder.Int64) + 1
 
-	var sub domain.Subtask
+	var sub service.Task
 	if err := tx.QueryRow(`
 		INSERT INTO subtasks (id, account_id, task_id, category_id, name, sort_order)
 		SELECT ?1, ?2, id, category_id, ?4, ?5
@@ -843,12 +959,12 @@ func (s *SQLiteStore) AddSubtask(accountID string, taskID string, name string) (
 			public`,
 		id,
 		accountID,
-		taskID,
+		projectID,
 		name,
 		order,
 	).Scan(
 		&sub.ID,
-		&sub.TaskID,
+		&sub.ProjectID,
 		&sub.CategoryID,
 		&sub.Name,
 		&sub.Description,
@@ -865,8 +981,14 @@ func (s *SQLiteStore) AddSubtask(accountID string, taskID string, name string) (
 	return &sub, nil
 }
 
-func (s *SQLiteStore) UpdateSubtask(accountID string, sub *domain.Subtask) (*domain.Subtask, error) {
-	var updated domain.Subtask
+func (s *SQLiteStore) UpdateTask(
+	accountID string,
+	sub *service.Task,
+) (
+	*service.Task,
+	error,
+) {
+	var updated service.Task
 	if err := s.db.QueryRow(`
 		UPDATE subtasks
 		SET name = ?1,
@@ -890,7 +1012,7 @@ func (s *SQLiteStore) UpdateSubtask(accountID string, sub *domain.Subtask) (*dom
 		sub.ID,
 	).Scan(
 		&updated.ID,
-		&updated.TaskID,
+		&updated.ProjectID,
 		&updated.CategoryID,
 		&updated.Name,
 		&updated.Description,
@@ -903,8 +1025,14 @@ func (s *SQLiteStore) UpdateSubtask(accountID string, sub *domain.Subtask) (*dom
 	return &updated, nil
 }
 
-func (s *SQLiteStore) DeleteSubtask(accountID string, id string) (*domain.Subtask, error) {
-	var removed domain.Subtask
+func (s *SQLiteStore) DeleteTask(
+	accountID string,
+	id string,
+) (
+	*service.Task,
+	error,
+) {
+	var removed service.Task
 	if err := s.db.QueryRow(`
 		DELETE FROM subtasks
 		WHERE account_id = ?1 AND id = ?2
@@ -919,14 +1047,14 @@ func (s *SQLiteStore) DeleteSubtask(accountID string, id string) (*domain.Subtas
 		id,
 	).Scan(
 		&removed.ID,
-		&removed.TaskID,
+		&removed.ProjectID,
 		&removed.CategoryID,
 		&removed.Name,
 		&removed.Description,
 		&removed.Completion,
 	); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, fmt.Errorf("subtask not found")
+			return nil, fmt.Errorf("task not found")
 		}
 		return nil, err
 	}
@@ -934,14 +1062,18 @@ func (s *SQLiteStore) DeleteSubtask(accountID string, id string) (*domain.Subtas
 	return &removed, nil
 }
 
-func (s *SQLiteStore) ReorderSubtasks(accountID string, taskID string, subIDs []string) error {
+func (s *SQLiteStore) ReorderTasks(
+	accountID string,
+	projectID string,
+	taskIDs []string,
+) error {
 	tx, err := s.db.Begin()
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
 
-	for i, id := range subIDs {
+	for i, id := range taskIDs {
 		if _, err := tx.Exec(`
 			UPDATE subtasks
 			SET sort_order = ?1
@@ -949,7 +1081,7 @@ func (s *SQLiteStore) ReorderSubtasks(accountID string, taskID string, subIDs []
 			i,
 			accountID,
 			id,
-			taskID,
+			projectID,
 		); err != nil {
 			return err
 		}
@@ -957,7 +1089,17 @@ func (s *SQLiteStore) ReorderSubtasks(accountID string, taskID string, subIDs []
 	return tx.Commit()
 }
 
-func (s *SQLiteStore) AddWorkLogForTask(accountID string, taskID string, hoursWorked float64, workDescription string, completionEstimate int, customTime *time.Time) (*domain.WorkLog, error) {
+func (s *SQLiteStore) AddWorkLogForProject(
+	accountID string,
+	projectID string,
+	hoursWorked float64,
+	workDescription string,
+	completionEstimate int,
+	customTime *time.Time,
+) (
+	*service.WorkLog,
+	error,
+) {
 	id := uuid.NewString()
 	timestamp := time.Now()
 	if customTime != nil {
@@ -970,7 +1112,7 @@ func (s *SQLiteStore) AddWorkLogForTask(accountID string, taskID string, hoursWo
 	}
 	defer tx.Rollback()
 
-	var wl domain.WorkLog
+	var wl service.WorkLog
 	var createdAtUnix int64
 	var subtaskIDNull sql.NullString
 
@@ -1008,7 +1150,7 @@ func (s *SQLiteStore) AddWorkLogForTask(accountID string, taskID string, hoursWo
 			created_at`,
 		id,
 		accountID,
-		taskID,
+		projectID,
 		hoursWorked,
 		workDescription,
 		completionEstimate,
@@ -1016,7 +1158,7 @@ func (s *SQLiteStore) AddWorkLogForTask(accountID string, taskID string, hoursWo
 	).Scan(
 		&wl.ID,
 		&wl.CategoryID,
-		&wl.TaskID,
+		&wl.ProjectID,
 		&subtaskIDNull,
 		&wl.HoursWorked,
 		&wl.WorkDescription,
@@ -1026,7 +1168,7 @@ func (s *SQLiteStore) AddWorkLogForTask(accountID string, taskID string, hoursWo
 		return nil, err
 	}
 
-	wl.SubtaskID = subtaskIDNull.String
+	wl.TaskID = subtaskIDNull.String
 	wl.CreatedAt = time.Unix(createdAtUnix, 0)
 
 	if _, err := tx.Exec(`
@@ -1035,7 +1177,7 @@ func (s *SQLiteStore) AddWorkLogForTask(accountID string, taskID string, hoursWo
 		WHERE account_id = ?2 AND id = ?3`,
 		completionEstimate,
 		accountID,
-		taskID,
+		projectID,
 	); err != nil {
 		return nil, err
 	}
@@ -1047,7 +1189,17 @@ func (s *SQLiteStore) AddWorkLogForTask(accountID string, taskID string, hoursWo
 	return &wl, nil
 }
 
-func (s *SQLiteStore) AddWorkLogForSubtask(accountID string, subtaskID string, hoursWorked float64, workDescription string, completionEstimate int, customTime *time.Time) (*domain.WorkLog, error) {
+func (s *SQLiteStore) AddWorkLogForTask(
+	accountID string,
+	taskID string,
+	hoursWorked float64,
+	workDescription string,
+	completionEstimate int,
+	customTime *time.Time,
+) (
+	*service.WorkLog,
+	error,
+) {
 	id := uuid.NewString()
 	timestamp := time.Now()
 	if customTime != nil {
@@ -1060,7 +1212,7 @@ func (s *SQLiteStore) AddWorkLogForSubtask(accountID string, subtaskID string, h
 	}
 	defer tx.Rollback()
 
-	var wl domain.WorkLog
+	var wl service.WorkLog
 	var createdAtUnix int64
 	var subtaskIDNull sql.NullString
 
@@ -1099,7 +1251,7 @@ func (s *SQLiteStore) AddWorkLogForSubtask(accountID string, subtaskID string, h
 			created_at`,
 		id,
 		accountID,
-		subtaskID,
+		taskID,
 		hoursWorked,
 		workDescription,
 		completionEstimate,
@@ -1107,7 +1259,7 @@ func (s *SQLiteStore) AddWorkLogForSubtask(accountID string, subtaskID string, h
 	).Scan(
 		&wl.ID,
 		&wl.CategoryID,
-		&wl.TaskID,
+		&wl.ProjectID,
 		&subtaskIDNull,
 		&wl.HoursWorked,
 		&wl.WorkDescription,
@@ -1117,7 +1269,7 @@ func (s *SQLiteStore) AddWorkLogForSubtask(accountID string, subtaskID string, h
 		return nil, err
 	}
 
-	wl.SubtaskID = subtaskIDNull.String
+	wl.TaskID = subtaskIDNull.String
 	wl.CreatedAt = time.Unix(createdAtUnix, 0)
 
 	if _, err := tx.Exec(`
@@ -1126,7 +1278,7 @@ func (s *SQLiteStore) AddWorkLogForSubtask(accountID string, subtaskID string, h
 		WHERE account_id = ?2 AND id = ?3`,
 		completionEstimate,
 		accountID,
-		subtaskID,
+		taskID,
 	); err != nil {
 		return nil, err
 	}
@@ -1138,17 +1290,22 @@ func (s *SQLiteStore) AddWorkLogForSubtask(accountID string, subtaskID string, h
 	return &wl, nil
 }
 
-func (s *SQLiteStore) scanWorkLogs(rows *sql.Rows) ([]*domain.WorkLog, error) {
+func (s *SQLiteStore) scanWorkLogs(
+	rows *sql.Rows,
+) (
+	[]*service.WorkLog,
+	error,
+) {
 	defer rows.Close()
-	var logs []*domain.WorkLog
+	var logs []*service.WorkLog
 	for rows.Next() {
-		var wl domain.WorkLog
+		var wl service.WorkLog
 		var createdAt int64
 		var subtaskID sql.NullString
 		if err := rows.Scan(
 			&wl.ID,
 			&wl.CategoryID,
-			&wl.TaskID,
+			&wl.ProjectID,
 			&subtaskID,
 			&wl.HoursWorked,
 			&wl.WorkDescription,
@@ -1157,14 +1314,20 @@ func (s *SQLiteStore) scanWorkLogs(rows *sql.Rows) ([]*domain.WorkLog, error) {
 		); err != nil {
 			return nil, err
 		}
-		wl.SubtaskID = subtaskID.String
+		wl.TaskID = subtaskID.String
 		wl.CreatedAt = time.Unix(createdAt, 0)
 		logs = append(logs, &wl)
 	}
 	return logs, rows.Err()
 }
 
-func (s *SQLiteStore) GetWorkLogsForSubtask(accountID string, subtaskID string) ([]*domain.WorkLog, error) {
+func (s *SQLiteStore) GetWorkLogsForTask(
+	accountID string,
+	taskID string,
+) (
+	[]*service.WorkLog,
+	error,
+) {
 	rows, err := s.db.Query(`
 		SELECT
 			id,
@@ -1177,14 +1340,20 @@ func (s *SQLiteStore) GetWorkLogsForSubtask(accountID string, subtaskID string) 
 			created_at
 		FROM work_logs
 		WHERE account_id = ?1 AND subtask_id = ?2
-		ORDER BY created_at DESC`, accountID, subtaskID)
+		ORDER BY created_at DESC`, accountID, taskID)
 	if err != nil {
 		return nil, err
 	}
 	return s.scanWorkLogs(rows)
 }
 
-func (s *SQLiteStore) GetWorkLogsForTask(accountID string, taskID string) ([]*domain.WorkLog, error) {
+func (s *SQLiteStore) GetWorkLogsForProject(
+	accountID string,
+	projectID string,
+) (
+	[]*service.WorkLog,
+	error,
+) {
 	rows, err := s.db.Query(`
 		SELECT
 			id,
@@ -1199,14 +1368,20 @@ func (s *SQLiteStore) GetWorkLogsForTask(accountID string, taskID string) ([]*do
 		WHERE account_id = ?1 AND task_id = ?2
 		ORDER BY created_at DESC`,
 		accountID,
-		taskID)
+		projectID)
 	if err != nil {
 		return nil, err
 	}
 	return s.scanWorkLogs(rows)
 }
 
-func (s *SQLiteStore) GetWorkLogsForCategory(accountID string, categoryID string) ([]*domain.WorkLog, error) {
+func (s *SQLiteStore) GetWorkLogsForCategory(
+	accountID string,
+	categoryID string,
+) (
+	[]*service.WorkLog,
+	error,
+) {
 	rows, err := s.db.Query(`
 		SELECT
 			id,

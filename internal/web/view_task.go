@@ -3,7 +3,7 @@ package web
 import (
 	"io"
 
-	"git.sr.ht/~jakintosh/compass/internal/domain"
+	"git.sr.ht/~jakintosh/compass/internal/service"
 )
 
 // TaskView is the view model for Task
@@ -22,8 +22,12 @@ type TaskView struct {
 	DeleteButton DeleteButtonView
 }
 
-// NewTaskView creates a TaskView from a domain Task
-func NewTaskView(t *domain.Task, oob bool, auth AuthContext) TaskView {
+// NewTaskView creates a TaskView from a service Project.
+func NewTaskView(
+	t *service.Project,
+	oob bool,
+	auth AuthContext,
+) TaskView {
 	view := TaskView{
 		AuthContext:  auth,
 		ID:           t.ID,
@@ -34,10 +38,10 @@ func NewTaskView(t *domain.Task, oob bool, auth AuthContext) TaskView {
 		ParentPublic: t.ParentPublic,
 		OOB:          oob,
 	}
-	if len(t.Subtasks) > 0 {
+	if len(t.Tasks) > 0 {
 		view.HasSubtasks = true
-		view.Subtasks = make([]SubtaskView, len(t.Subtasks))
-		for i, s := range t.Subtasks {
+		view.Subtasks = make([]SubtaskView, len(t.Tasks))
+		for i, s := range t.Tasks {
 			view.Subtasks[i] = NewSubtaskView(s, false, auth)
 		}
 	}
@@ -54,11 +58,17 @@ func NewTaskView(t *domain.Task, oob bool, auth AuthContext) TaskView {
 }
 
 // RenderTask renders a single task from its view model
-func (p *Renderer) RenderTask(w io.Writer, view TaskView) error {
+func (p *Renderer) RenderTask(
+	w io.Writer,
+	view TaskView,
+) error {
 	return p.tmpl.ExecuteTemplate(w, "task.html", view)
 }
 
 // RenderTaskDetails renders the task details slideover
-func (p *Renderer) RenderTaskDetails(w io.Writer, view TaskView) error {
+func (p *Renderer) RenderTaskDetails(
+	w io.Writer,
+	view TaskView,
+) error {
 	return p.tmpl.ExecuteTemplate(w, "details", view)
 }

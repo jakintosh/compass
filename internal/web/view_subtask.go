@@ -3,7 +3,7 @@ package web
 import (
 	"io"
 
-	"git.sr.ht/~jakintosh/compass/internal/domain"
+	"git.sr.ht/~jakintosh/compass/internal/service"
 )
 
 // SubtaskView is the view model for Subtask
@@ -20,8 +20,12 @@ type SubtaskView struct {
 	DeleteButton DeleteButtonView
 }
 
-// NewSubtaskView creates a SubtaskView from a domain Subtask
-func NewSubtaskView(s *domain.Subtask, oob bool, auth AuthContext) SubtaskView {
+// NewSubtaskView creates a SubtaskView from a service Task.
+func NewSubtaskView(
+	s *service.Task,
+	oob bool,
+	auth AuthContext,
+) SubtaskView {
 	return SubtaskView{
 		AuthContext:  auth,
 		ID:           s.ID,
@@ -41,11 +45,17 @@ func NewSubtaskView(s *domain.Subtask, oob bool, auth AuthContext) SubtaskView {
 }
 
 // RenderSubtask renders a single subtask from its view model
-func (p *Renderer) RenderSubtask(w io.Writer, view SubtaskView) error {
+func (p *Renderer) RenderSubtask(
+	w io.Writer,
+	view SubtaskView,
+) error {
 	return p.tmpl.ExecuteTemplate(w, "subtask.html", view)
 }
 
 // RenderSubtaskDetails renders the subtask details slideover
-func (p *Renderer) RenderSubtaskDetails(w io.Writer, view SubtaskView) error {
+func (p *Renderer) RenderSubtaskDetails(
+	w io.Writer,
+	view SubtaskView,
+) error {
 	return p.tmpl.ExecuteTemplate(w, "subtask_details", view)
 }

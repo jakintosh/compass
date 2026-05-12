@@ -3,7 +3,7 @@ package web
 import (
 	"io"
 
-	"git.sr.ht/~jakintosh/compass/internal/domain"
+	"git.sr.ht/~jakintosh/compass/internal/service"
 )
 
 // CategoryView is the view model for Category
@@ -20,8 +20,12 @@ type CategoryView struct {
 	DeleteButton      DeleteButtonView
 }
 
-// NewCategoryView creates a CategoryView from a domain Category
-func NewCategoryView(c *domain.Category, oob bool, auth AuthContext) CategoryView {
+// NewCategoryView creates a CategoryView from a service Category
+func NewCategoryView(
+	c *service.Category,
+	oob bool,
+	auth AuthContext,
+) CategoryView {
 	view := CategoryView{
 		AuthContext:       auth,
 		ID:                c.ID,
@@ -32,10 +36,10 @@ func NewCategoryView(c *domain.Category, oob bool, auth AuthContext) CategoryVie
 		OOB:               oob,
 		WorkLogs:          NewWorkLogViewsFromCategory(c),
 	}
-	if len(c.Tasks) > 0 {
-		view.Tasks = make([]TaskView, len(c.Tasks))
-		for i, t := range c.Tasks {
-			view.Tasks[i] = NewTaskView(t, false, auth)
+	if len(c.Projects) > 0 {
+		view.Tasks = make([]TaskView, len(c.Projects))
+		for i, p := range c.Projects {
+			view.Tasks[i] = NewTaskView(p, false, auth)
 		}
 	}
 
@@ -49,22 +53,34 @@ func NewCategoryView(c *domain.Category, oob bool, auth AuthContext) CategoryVie
 }
 
 // RenderCategory renders a single category from its view model
-func (p *Renderer) RenderCategory(w io.Writer, view CategoryView) error {
+func (p *Renderer) RenderCategory(
+	w io.Writer,
+	view CategoryView,
+) error {
 	return p.tmpl.ExecuteTemplate(w, "category.html", view)
 }
 
 // RenderCategoryDetails renders the category details slideover
-func (p *Renderer) RenderCategoryDetails(w io.Writer, view CategoryView) error {
+func (p *Renderer) RenderCategoryDetails(
+	w io.Writer,
+	view CategoryView,
+) error {
 	return p.tmpl.ExecuteTemplate(w, "category_details", view)
 }
 
 // RenderCategoryOOB renders a category as an out-of-band update
-func (p *Renderer) RenderCategoryOOB(w io.Writer, view CategoryView) error {
+func (p *Renderer) RenderCategoryOOB(
+	w io.Writer,
+	view CategoryView,
+) error {
 	return p.tmpl.ExecuteTemplate(w, "category.html", view)
 }
 
 // RenderCategoryDeleteOOB renders OOB updates for category deletion
-func (p *Renderer) RenderCategoryDeleteOOB(w io.Writer, id string) error {
+func (p *Renderer) RenderCategoryDeleteOOB(
+	w io.Writer,
+	id string,
+) error {
 	if err := p.RenderSlideoverClear(w); err != nil {
 		return err
 	}

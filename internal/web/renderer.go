@@ -14,7 +14,10 @@ type Renderer struct {
 	tmpl *template.Template
 }
 
-func NewRenderer() (*Renderer, error) {
+func NewRenderer() (
+	*Renderer,
+	error,
+) {
 	tmpl := template.New("base")
 
 	tmpl, err := tmpl.ParseFS(templateFS, "templates/*")

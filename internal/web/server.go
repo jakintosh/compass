@@ -2,7 +2,6 @@ package web
 
 import (
 	"bytes"
-	"database/sql"
 	"errors"
 	"log"
 	"net/http"
@@ -11,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"git.sr.ht/~jakintosh/compass/internal/domain"
+	"git.sr.ht/~jakintosh/compass/internal/service"
 	"git.sr.ht/~jakintosh/consent/pkg/client"
 )
 
@@ -46,15 +45,24 @@ type ServerOptions struct {
 }
 
 type Server struct {
-	store    domain.Store
+	service  *service.Service
 	router   *http.ServeMux
 	renderer *Renderer
 	auth     AuthConfig
 }
 
-func NewServer(store domain.Store, opts ServerOptions) (*Server, error) {
+func NewServer(
+	svc *service.Service,
+	opts ServerOptions,
+) (
+	*Server,
+	error,
+) {
 	if opts.Auth.Verifier == nil {
 		return nil, errors.New("Auth.Verifier is required")
+	}
+	if svc == nil {
+		return nil, errors.New("service is required")
 	}
 
 	renderer, err := NewRenderer()
@@ -62,7 +70,7 @@ func NewServer(store domain.Store, opts ServerOptions) (*Server, error) {
 		return nil, err
 	}
 	s := &Server{
-		store:    store,
+		service:  svc,
 		router:   http.NewServeMux(),
 		renderer: renderer,
 		auth:     opts.Auth,
@@ -71,7 +79,10 @@ func NewServer(store domain.Store, opts ServerOptions) (*Server, error) {
 	return s, nil
 }
 
-func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (s *Server) ServeHTTP(
+	w http.ResponseWriter,
+	r *http.Request,
+) {
 	s.router.ServeHTTP(w, r)
 }
 
@@ -91,7 +102,10 @@ func (s *Server) routes() {
 	s.router.HandleFunc("/", s.handleTenantRoute)
 }
 
-func (s *Server) handleTenantRoute(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleTenantRoute(
+	w http.ResponseWriter,
+	r *http.Request,
+) {
 	segments := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
 	if len(segments) == 0 || segments[0] == "" {
 		http.NotFound(w, r)
@@ -126,7 +140,11 @@ func (s *Server) handleTenantRoute(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *Server) dispatchCategoryRoute(w http.ResponseWriter, r *http.Request, segments []string) {
+func (s *Server) dispatchCategoryRoute(
+	w http.ResponseWriter,
+	r *http.Request,
+	segments []string,
+) {
 	if len(segments) == 2 && r.Method == http.MethodPost {
 		s.handleCreateCategory(w, r)
 		return
@@ -160,7 +178,11 @@ func (s *Server) dispatchCategoryRoute(w http.ResponseWriter, r *http.Request, s
 	http.NotFound(w, r)
 }
 
-func (s *Server) dispatchTaskRoute(w http.ResponseWriter, r *http.Request, segments []string) {
+func (s *Server) dispatchTaskRoute(
+	w http.ResponseWriter,
+	r *http.Request,
+	segments []string,
+) {
 	if len(segments) == 3 && segments[2] == "reorder" && r.Method == http.MethodPost {
 		s.handleReorderTasks(w, r)
 		return
@@ -194,7 +216,11 @@ func (s *Server) dispatchTaskRoute(w http.ResponseWriter, r *http.Request, segme
 	http.NotFound(w, r)
 }
 
-func (s *Server) dispatchSubtaskRoute(w http.ResponseWriter, r *http.Request, segments []string) {
+func (s *Server) dispatchSubtaskRoute(
+	w http.ResponseWriter,
+	r *http.Request,
+	segments []string,
+) {
 	if len(segments) == 3 && segments[2] == "reorder" && r.Method == http.MethodPost {
 		s.handleReorderSubtasks(w, r)
 		return
@@ -226,7 +252,10 @@ func (s *Server) dispatchSubtaskRoute(w http.ResponseWriter, r *http.Request, se
 
 // getAuthContext attempts to verify auth and returns context with CSRF token.
 // Returns unauthenticated context if verification fails.
-func (s *Server) getAuthContext(w http.ResponseWriter, r *http.Request) AuthContext {
+func (s *Server) getAuthContext(
+	w http.ResponseWriter,
+	r *http.Request,
+) AuthContext {
 	// Build base context with auth URLs
 	ctx := AuthContext{
 		IsAuthenticated: false,
@@ -256,7 +285,13 @@ func (s *Server) getAuthContext(w http.ResponseWriter, r *http.Request) AuthCont
 
 // requireAuth verifies auth and CSRF for destructive operations.
 // Returns auth context and true if authorized, writes error response if not.
-func (s *Server) requireAuth(w http.ResponseWriter, r *http.Request) (AuthContext, bool) {
+func (s *Server) requireAuth(
+	w http.ResponseWriter,
+	r *http.Request,
+) (
+	AuthContext,
+	bool,
+) {
 	// Get CSRF from request (form value or query param)
 	csrf := r.FormValue("csrf")
 	if csrf == "" {
@@ -290,7 +325,10 @@ func (s *Server) requireAuth(w http.ResponseWriter, r *http.Request) (AuthContex
 	return auth, true
 }
 
-func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleIndex(
+	w http.ResponseWriter,
+	r *http.Request,
+) {
 	auth := s.getAuthContext(w, r)
 	if auth.IsAuthenticated && auth.Handle != "" {
 		http.Redirect(w, r, "/"+url.PathEscape(auth.Handle)+"/", http.StatusSeeOther)
@@ -298,26 +336,24 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := s.renderer.RenderIndex(w, nil, auth); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		writeServiceError(w, err)
 	}
 }
 
-func (s *Server) handleTenantIndex(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleTenantIndex(
+	w http.ResponseWriter,
+	r *http.Request,
+) {
 	auth := s.getAuthContext(w, r)
 	account, auth, ok := s.resolveTenant(w, r, auth, false)
 	if !ok {
 		return
 	}
 
-	cats, err := s.store.GetCategories(account.ID)
+	cats, err := s.service.ListCategories(service.ListCategoriesInput{AccountID: account.ID, Viewer: viewerFromAuth(auth)})
 	if err != nil {
 		http.Error(w, "Failed to load categories", http.StatusInternalServerError)
 		return
-	}
-
-	// Filter out non-public items for unauthenticated users or non-owner viewers.
-	if !auth.CanWrite {
-		cats = filterPublicCategories(cats)
 	}
 
 	// Convert to view models
@@ -327,11 +363,13 @@ func (s *Server) handleTenantIndex(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := s.renderer.RenderIndex(w, catViews, auth); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		writeServiceError(w, err)
 	}
 }
 
-func (s *Server) loginURL(r *http.Request) string {
+func (s *Server) loginURL(
+	r *http.Request,
+) string {
 	if s.auth.LoginURL == "" {
 		return ""
 	}
@@ -347,13 +385,18 @@ func (s *Server) loginURL(r *http.Request) string {
 	return loginURL.String()
 }
 
-func (s *Server) accountForToken(accessToken *client.AccessToken) (*domain.Account, error) {
+func (s *Server) accountForToken(
+	accessToken *client.AccessToken,
+) (
+	*service.Account,
+	error,
+) {
 	subject := accessToken.Subject()
-	account, err := s.store.GetAccountBySubject(subject)
+	account, err := s.service.GetAccountBySubject(service.GetAccountBySubjectInput{Subject: subject})
 	if err == nil && !s.shouldRefreshProfile(account) {
 		return account, nil
 	}
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+	if err != nil && !errors.Is(err, service.ErrNotFound) {
 		return nil, err
 	}
 
@@ -374,14 +417,16 @@ func (s *Server) accountForToken(accessToken *client.AccessToken) (*domain.Accou
 		handle = userInfo.Profile.Handle
 	}
 
-	account, err = s.store.UpsertAccount(subject, handle, refreshedAt)
+	account, err = s.service.UpsertAccount(service.UpsertAccountInput{Subject: subject, Handle: handle, RefreshedAt: refreshedAt})
 	if err != nil {
 		return nil, err
 	}
 	return account, nil
 }
 
-func (s *Server) shouldRefreshProfile(account *domain.Account) bool {
+func (s *Server) shouldRefreshProfile(
+	account *service.Account,
+) bool {
 	interval := s.auth.ProfileRefreshInterval
 	if interval <= 0 {
 		interval = 24 * time.Hour
@@ -389,9 +434,18 @@ func (s *Server) shouldRefreshProfile(account *domain.Account) bool {
 	return time.Since(account.ProfileRefreshedAt) >= interval
 }
 
-func (s *Server) resolveTenant(w http.ResponseWriter, r *http.Request, auth AuthContext, requireOwner bool) (*domain.Account, AuthContext, bool) {
+func (s *Server) resolveTenant(
+	w http.ResponseWriter,
+	r *http.Request,
+	auth AuthContext,
+	requireOwner bool,
+) (
+	*service.Account,
+	AuthContext,
+	bool,
+) {
 	handle := r.PathValue("handle")
-	account, err := s.store.GetAccountByHandle(handle)
+	account, err := s.service.GetAccountByHandle(service.GetAccountByHandleInput{Handle: handle})
 	if err != nil {
 		http.Error(w, "Not found", http.StatusNotFound)
 		return nil, auth, false
@@ -406,36 +460,35 @@ func (s *Server) resolveTenant(w http.ResponseWriter, r *http.Request, auth Auth
 	return account, auth, true
 }
 
-// filterPublicCategories removes non-public categories, tasks, and subtasks
-func filterPublicCategories(cats []*domain.Category) []*domain.Category {
-	var result []*domain.Category
-	for _, c := range cats {
-		if !c.Public {
-			continue
-		}
-		// Filter tasks within public category
-		var publicTasks []*domain.Task
-		for _, t := range c.Tasks {
-			if !t.Public {
-				continue
-			}
-			// Filter subtasks within public task
-			var publicSubs []*domain.Subtask
-			for _, s := range t.Subtasks {
-				if s.Public {
-					publicSubs = append(publicSubs, s)
-				}
-			}
-			t.Subtasks = publicSubs
-			publicTasks = append(publicTasks, t)
-		}
-		c.Tasks = publicTasks
-		result = append(result, c)
+func viewerFromAuth(
+	auth AuthContext,
+) service.Viewer {
+	if auth.CanWrite {
+		return service.OwnerViewer()
 	}
-	return result
+	return service.PublicViewer()
 }
 
-func (s *Server) handleCreateCategory(w http.ResponseWriter, r *http.Request) {
+func writeServiceError(
+	w http.ResponseWriter,
+	err error,
+) {
+	switch {
+	case errors.Is(err, service.ErrInvalidInput):
+		http.Error(w, err.Error(), http.StatusBadRequest)
+	case errors.Is(err, service.ErrForbidden):
+		http.Error(w, err.Error(), http.StatusForbidden)
+	case errors.Is(err, service.ErrNotFound):
+		http.Error(w, err.Error(), http.StatusNotFound)
+	default:
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+func (s *Server) handleCreateCategory(
+	w http.ResponseWriter,
+	r *http.Request,
+) {
 	auth, ok := s.requireAuth(w, r)
 	if !ok {
 		return
@@ -446,9 +499,9 @@ func (s *Server) handleCreateCategory(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx := parseRequestContext(r)
-	cat, err := s.store.AddCategory(account.ID, "New Category")
+	cat, err := s.service.CreateCategory(service.CreateCategoryInput{AccountID: account.ID, Name: "New Category"})
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		writeServiceError(w, err)
 		return
 	}
 
@@ -459,16 +512,19 @@ func (s *Server) handleCreateCategory(w http.ResponseWriter, r *http.Request) {
 
 	catView := NewCategoryView(cat, false, auth)
 	if err := s.renderer.RenderCategory(w, catView); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		writeServiceError(w, err)
 		return
 	}
 
 	if err := s.renderer.RenderSlideoverWithDetails(w, catView); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		writeServiceError(w, err)
 	}
 }
 
-func (s *Server) handleUpdateCategory(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleUpdateCategory(
+	w http.ResponseWriter,
+	r *http.Request,
+) {
 	auth, ok := s.requireAuth(w, r)
 	if !ok {
 		return
@@ -480,29 +536,27 @@ func (s *Server) handleUpdateCategory(w http.ResponseWriter, r *http.Request) {
 
 	ctx := parseRequestContext(r)
 	id := r.PathValue("id")
-	cat, err := s.store.GetCategory(account.ID, id)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusNotFound)
-		return
-	}
-
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
+	var update service.UpdateCategoryInput
+	update.AccountID = account.ID
+	update.ID = id
 	if name := r.FormValue("name"); name != "" {
-		cat.Name = name
+		update.Name = &name
 	} else if desc := r.FormValue("description"); desc != "" {
-		cat.Description = desc
+		update.Description = &desc
 	} else {
 		// Public toggle form - checkbox sends "on" when checked, nothing when unchecked
-		cat.Public = r.FormValue("public") == "on"
+		public := r.FormValue("public") == "on"
+		update.Public = &public
 	}
 
-	cat, err = s.store.UpdateCategory(account.ID, cat)
+	cat, err := s.service.UpdateCategory(update)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		writeServiceError(w, err)
 		return
 	}
 
@@ -514,11 +568,14 @@ func (s *Server) handleUpdateCategory(w http.ResponseWriter, r *http.Request) {
 	// Render OOB updates for category
 	catView := NewCategoryView(cat, true, auth)
 	if err := s.renderer.RenderCategory(w, catView); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		writeServiceError(w, err)
 	}
 }
 
-func (s *Server) handleGetCategoryDetails(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleGetCategoryDetails(
+	w http.ResponseWriter,
+	r *http.Request,
+) {
 	auth := s.getAuthContext(w, r)
 	account, auth, ok := s.resolveTenant(w, r, auth, false)
 	if !ok {
@@ -527,41 +584,24 @@ func (s *Server) handleGetCategoryDetails(w http.ResponseWriter, r *http.Request
 	ctx := parseRequestContext(r)
 	id := r.PathValue("id")
 
-	cat, err := s.store.GetCategory(account.ID, id)
+	cat, err := s.service.GetCategoryWithWorkLogs(service.GetCategoryInput{AccountID: account.ID, ID: id, Viewer: viewerFromAuth(auth)})
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusNotFound)
+		writeServiceError(w, err)
 		return
 	}
-
-	// Private items are not accessible to unauthenticated users
-	if !auth.CanWrite && !cat.Public {
-		http.Error(w, "Not found", http.StatusNotFound)
-		return
-	}
-
-	// Fetch work logs for category
-	workLogs, err := s.store.GetWorkLogsForCategory(account.ID, id)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	cat.WorkLogs = workLogs
 
 	if ctx.IsHTMX {
 		if err := s.renderer.RenderCategoryDetails(w, NewCategoryView(cat, false, auth)); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			writeServiceError(w, err)
 		}
 		return
 	}
 
 	// Deep Linking: Render full page with details open
-	cats, err := s.store.GetCategories(account.ID)
+	cats, err := s.service.ListCategories(service.ListCategoriesInput{AccountID: account.ID, Viewer: viewerFromAuth(auth)})
 	if err != nil {
 		http.Error(w, "Failed to load categories", http.StatusInternalServerError)
 		return
-	}
-	if !auth.CanWrite {
-		cats = filterPublicCategories(cats)
 	}
 
 	catViews := make([]CategoryView, len(cats))
@@ -570,11 +610,14 @@ func (s *Server) handleGetCategoryDetails(w http.ResponseWriter, r *http.Request
 	}
 
 	if err := s.renderer.RenderIndexWithDetails(w, catViews, auth, NewCategoryView(cat, false, auth)); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		writeServiceError(w, err)
 	}
 }
 
-func (s *Server) handleCreateTask(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleCreateTask(
+	w http.ResponseWriter,
+	r *http.Request,
+) {
 	auth, ok := s.requireAuth(w, r)
 	if !ok {
 		return
@@ -587,9 +630,9 @@ func (s *Server) handleCreateTask(w http.ResponseWriter, r *http.Request) {
 	ctx := parseRequestContext(r)
 	catID := r.PathValue("id")
 
-	task, err := s.store.AddTask(account.ID, catID, "New Task")
+	task, err := s.service.CreateProject(service.CreateProjectInput{AccountID: account.ID, CategoryID: catID, Name: "New Task"})
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		writeServiceError(w, err)
 		return
 	}
 
@@ -599,27 +642,30 @@ func (s *Server) handleCreateTask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Re-fetch category and render it as OOB
-	cat, err := s.store.GetCategory(account.ID, catID)
+	cat, err := s.service.GetCategory(service.GetCategoryInput{AccountID: account.ID, ID: catID, Viewer: service.OwnerViewer()})
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		writeServiceError(w, err)
 		return
 	}
 
 	catView := NewCategoryView(cat, true, auth)
 	var buf bytes.Buffer
 	if err := s.renderer.RenderCategoryOOB(&buf, catView); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		writeServiceError(w, err)
 		return
 	}
 	w.Write(buf.Bytes())
 
 	taskView := NewTaskView(task, false, auth)
 	if err := s.renderer.RenderSlideoverWithDetails(w, taskView); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		writeServiceError(w, err)
 	}
 }
 
-func (s *Server) handleUpdateTask(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleUpdateTask(
+	w http.ResponseWriter,
+	r *http.Request,
+) {
 	auth, ok := s.requireAuth(w, r)
 	if !ok {
 		return
@@ -632,35 +678,33 @@ func (s *Server) handleUpdateTask(w http.ResponseWriter, r *http.Request) {
 	ctx := parseRequestContext(r)
 	id := r.PathValue("id")
 
-	task, err := s.store.GetTask(account.ID, id)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusNotFound)
-		return
-	}
-
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
+	var update service.UpdateProjectInput
+	update.AccountID = account.ID
+	update.ID = id
 	// Handle form field updates - only one field per form submission
 	if name := r.FormValue("name"); name != "" {
-		task.Name = name
+		update.Name = &name
 	} else if desc := r.FormValue("description"); desc != "" {
-		task.Description = desc
+		update.Description = &desc
 	} else if comp := r.FormValue("completion"); comp != "" {
 		val, err := strconv.Atoi(comp)
 		if err == nil {
-			task.Completion = val
+			update.Completion = &val
 		}
 	} else {
 		// Public toggle form
-		task.Public = r.FormValue("public") == "on"
+		public := r.FormValue("public") == "on"
+		update.Public = &public
 	}
 
-	task, err = s.store.UpdateTask(account.ID, task)
+	task, err := s.service.UpdateProject(update)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		writeServiceError(w, err)
 		return
 	}
 
@@ -670,22 +714,25 @@ func (s *Server) handleUpdateTask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Re-fetch category and render it as OOB
-	cat, err := s.store.GetCategory(account.ID, task.CategoryID)
+	cat, err := s.service.GetCategory(service.GetCategoryInput{AccountID: account.ID, ID: task.CategoryID, Viewer: service.OwnerViewer()})
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		writeServiceError(w, err)
 		return
 	}
 
 	catView := NewCategoryView(cat, true, auth)
 	var buf bytes.Buffer
 	if err := s.renderer.RenderCategoryOOB(&buf, catView); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		writeServiceError(w, err)
 		return
 	}
 	w.Write(buf.Bytes())
 }
 
-func (s *Server) handleGetSubtaskDetails(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleGetSubtaskDetails(
+	w http.ResponseWriter,
+	r *http.Request,
+) {
 	auth := s.getAuthContext(w, r)
 	account, auth, ok := s.resolveTenant(w, r, auth, false)
 	if !ok {
@@ -694,23 +741,9 @@ func (s *Server) handleGetSubtaskDetails(w http.ResponseWriter, r *http.Request)
 	ctx := parseRequestContext(r)
 	id := r.PathValue("id")
 
-	sub, err := s.store.GetSubtask(account.ID, id)
+	sub, err := s.service.GetTaskWithWorkLogs(service.GetTaskInput{AccountID: account.ID, ID: id, Viewer: viewerFromAuth(auth)})
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusNotFound)
-		return
-	}
-
-	// Fetch work logs for subtask
-	workLogs, err := s.store.GetWorkLogsForSubtask(account.ID, id)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	sub.WorkLogs = workLogs
-
-	// Private items are not accessible to unauthenticated users
-	if !auth.CanWrite && (!sub.ParentPublic || !sub.Public) {
-		http.Error(w, "Not found", http.StatusNotFound)
+		writeServiceError(w, err)
 		return
 	}
 
@@ -718,19 +751,16 @@ func (s *Server) handleGetSubtaskDetails(w http.ResponseWriter, r *http.Request)
 
 	if ctx.IsHTMX {
 		if err := s.renderer.RenderSubtaskDetails(w, subtaskView); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			writeServiceError(w, err)
 		}
 		return
 	}
 
 	// Deep Linking: Render full page with details open
-	cats, err := s.store.GetCategories(account.ID)
+	cats, err := s.service.ListCategories(service.ListCategoriesInput{AccountID: account.ID, Viewer: viewerFromAuth(auth)})
 	if err != nil {
 		http.Error(w, "Failed to load categories", http.StatusInternalServerError)
 		return
-	}
-	if !auth.CanWrite {
-		cats = filterPublicCategories(cats)
 	}
 
 	catViews := make([]CategoryView, len(cats))
@@ -739,11 +769,14 @@ func (s *Server) handleGetSubtaskDetails(w http.ResponseWriter, r *http.Request)
 	}
 
 	if err := s.renderer.RenderIndexWithDetails(w, catViews, auth, subtaskView); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		writeServiceError(w, err)
 	}
 }
 
-func (s *Server) handleGetTaskDetails(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleGetTaskDetails(
+	w http.ResponseWriter,
+	r *http.Request,
+) {
 	auth := s.getAuthContext(w, r)
 	account, auth, ok := s.resolveTenant(w, r, auth, false)
 	if !ok {
@@ -752,23 +785,9 @@ func (s *Server) handleGetTaskDetails(w http.ResponseWriter, r *http.Request) {
 	ctx := parseRequestContext(r)
 	id := r.PathValue("id")
 
-	task, err := s.store.GetTask(account.ID, id)
+	task, err := s.service.GetProjectWithWorkLogs(service.GetProjectInput{AccountID: account.ID, ID: id, Viewer: viewerFromAuth(auth)})
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusNotFound)
-		return
-	}
-
-	// Fetch work logs for task
-	workLogs, err := s.store.GetWorkLogsForTask(account.ID, id)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	task.WorkLogs = workLogs
-
-	// Private items are not accessible to unauthenticated users
-	if !auth.CanWrite && (!task.ParentPublic || !task.Public) {
-		http.Error(w, "Not found", http.StatusNotFound)
+		writeServiceError(w, err)
 		return
 	}
 
@@ -776,19 +795,16 @@ func (s *Server) handleGetTaskDetails(w http.ResponseWriter, r *http.Request) {
 
 	if ctx.IsHTMX {
 		if err := s.renderer.RenderTaskDetails(w, taskView); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			writeServiceError(w, err)
 		}
 		return
 	}
 
 	// Deep Linking: Render full page with details open
-	cats, err := s.store.GetCategories(account.ID)
+	cats, err := s.service.ListCategories(service.ListCategoriesInput{AccountID: account.ID, Viewer: viewerFromAuth(auth)})
 	if err != nil {
 		http.Error(w, "Failed to load categories", http.StatusInternalServerError)
 		return
-	}
-	if !auth.CanWrite {
-		cats = filterPublicCategories(cats)
 	}
 
 	catViews := make([]CategoryView, len(cats))
@@ -797,11 +813,14 @@ func (s *Server) handleGetTaskDetails(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := s.renderer.RenderIndexWithDetails(w, catViews, auth, taskView); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		writeServiceError(w, err)
 	}
 }
 
-func (s *Server) handleCreateSubtask(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleCreateSubtask(
+	w http.ResponseWriter,
+	r *http.Request,
+) {
 	auth, ok := s.requireAuth(w, r)
 	if !ok {
 		return
@@ -814,9 +833,9 @@ func (s *Server) handleCreateSubtask(w http.ResponseWriter, r *http.Request) {
 	ctx := parseRequestContext(r)
 	taskID := r.PathValue("id")
 
-	sub, err := s.store.AddSubtask(account.ID, taskID, "New Subtask")
+	sub, err := s.service.CreateTask(service.CreateTaskInput{AccountID: account.ID, ProjectID: taskID, Name: "New Subtask"})
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		writeServiceError(w, err)
 		return
 	}
 
@@ -826,27 +845,30 @@ func (s *Server) handleCreateSubtask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Fetch parent category and render it as OOB
-	cat, err := s.store.GetCategory(account.ID, sub.CategoryID)
+	cat, err := s.service.GetCategory(service.GetCategoryInput{AccountID: account.ID, ID: sub.CategoryID, Viewer: service.OwnerViewer()})
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		writeServiceError(w, err)
 		return
 	}
 
 	catView := NewCategoryView(cat, true, auth)
 	var buf bytes.Buffer
 	if err := s.renderer.RenderCategoryOOB(&buf, catView); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		writeServiceError(w, err)
 		return
 	}
 	w.Write(buf.Bytes())
 
 	subtaskView := NewSubtaskView(sub, false, auth)
 	if err := s.renderer.RenderSlideoverWithDetails(w, subtaskView); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		writeServiceError(w, err)
 	}
 }
 
-func (s *Server) handleUpdateSubtask(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleUpdateSubtask(
+	w http.ResponseWriter,
+	r *http.Request,
+) {
 	auth, ok := s.requireAuth(w, r)
 	if !ok {
 		return
@@ -858,35 +880,33 @@ func (s *Server) handleUpdateSubtask(w http.ResponseWriter, r *http.Request) {
 
 	ctx := parseRequestContext(r)
 	id := r.PathValue("id")
-	sub, err := s.store.GetSubtask(account.ID, id)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusNotFound)
-		return
-	}
-
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
+	var update service.UpdateTaskInput
+	update.AccountID = account.ID
+	update.ID = id
 	// Handle form field updates - only one field per form submission
 	if name := r.FormValue("name"); name != "" {
-		sub.Name = name
+		update.Name = &name
 	} else if desc := r.FormValue("description"); desc != "" {
-		sub.Description = desc
+		update.Description = &desc
 	} else if comp := r.FormValue("completion"); comp != "" {
 		val, err := strconv.Atoi(comp)
 		if err == nil {
-			sub.Completion = val
+			update.Completion = &val
 		}
 	} else {
 		// Public toggle form
-		sub.Public = r.FormValue("public") == "on"
+		public := r.FormValue("public") == "on"
+		update.Public = &public
 	}
 
-	sub, err = s.store.UpdateSubtask(account.ID, sub)
+	sub, err := s.service.UpdateTask(update)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		writeServiceError(w, err)
 		return
 	}
 
@@ -896,22 +916,25 @@ func (s *Server) handleUpdateSubtask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Fetch parent category and render it as OOB
-	cat, err := s.store.GetCategory(account.ID, sub.CategoryID)
+	cat, err := s.service.GetCategory(service.GetCategoryInput{AccountID: account.ID, ID: sub.CategoryID, Viewer: service.OwnerViewer()})
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		writeServiceError(w, err)
 		return
 	}
 
 	catView := NewCategoryView(cat, true, auth)
 	var buf bytes.Buffer
 	if err := s.renderer.RenderCategoryOOB(&buf, catView); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		writeServiceError(w, err)
 		return
 	}
 	w.Write(buf.Bytes())
 }
 
-func (s *Server) handleReorderCategories(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleReorderCategories(
+	w http.ResponseWriter,
+	r *http.Request,
+) {
 	auth, ok := s.requireAuth(w, r)
 	if !ok {
 		return
@@ -932,8 +955,8 @@ func (s *Server) handleReorderCategories(w http.ResponseWriter, r *http.Request)
 		return // Nothing to do
 	}
 
-	if err := s.store.ReorderCategories(account.ID, ids); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+	if err := s.service.ReorderCategories(service.ReorderCategoriesInput{AccountID: account.ID, IDs: ids}); err != nil {
+		writeServiceError(w, err)
 		return
 	}
 
@@ -944,7 +967,10 @@ func (s *Server) handleReorderCategories(w http.ResponseWriter, r *http.Request)
 	w.WriteHeader(http.StatusOK)
 }
 
-func (s *Server) handleReorderTasks(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleReorderTasks(
+	w http.ResponseWriter,
+	r *http.Request,
+) {
 	auth, ok := s.requireAuth(w, r)
 	if !ok {
 		return
@@ -966,8 +992,8 @@ func (s *Server) handleReorderTasks(w http.ResponseWriter, r *http.Request) {
 		return // Nothing to do
 	}
 
-	if err := s.store.ReorderTasks(account.ID, catID, ids); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+	if err := s.service.ReorderProjects(service.ReorderProjectsInput{AccountID: account.ID, CategoryID: catID, ProjectIDs: ids}); err != nil {
+		writeServiceError(w, err)
 		return
 	}
 
@@ -978,7 +1004,10 @@ func (s *Server) handleReorderTasks(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func (s *Server) handleReorderSubtasks(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleReorderSubtasks(
+	w http.ResponseWriter,
+	r *http.Request,
+) {
 	auth, ok := s.requireAuth(w, r)
 	if !ok {
 		return
@@ -997,8 +1026,8 @@ func (s *Server) handleReorderSubtasks(w http.ResponseWriter, r *http.Request) {
 	taskID := r.FormValue("task_id")
 	ids := r.Form["id"]
 
-	if err := s.store.ReorderSubtasks(account.ID, taskID, ids); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+	if err := s.service.ReorderTasks(service.ReorderTasksInput{AccountID: account.ID, ProjectID: taskID, TaskIDs: ids}); err != nil {
+		writeServiceError(w, err)
 		return
 	}
 
@@ -1009,7 +1038,10 @@ func (s *Server) handleReorderSubtasks(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func (s *Server) handleDeleteCategory(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleDeleteCategory(
+	w http.ResponseWriter,
+	r *http.Request,
+) {
 	auth, ok := s.requireAuth(w, r)
 	if !ok {
 		return
@@ -1022,8 +1054,8 @@ func (s *Server) handleDeleteCategory(w http.ResponseWriter, r *http.Request) {
 	ctx := parseRequestContext(r)
 	id := r.PathValue("id")
 
-	if _, err := s.store.DeleteCategory(account.ID, id); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+	if _, err := s.service.DeleteCategory(service.DeleteCategoryInput{AccountID: account.ID, ID: id}); err != nil {
+		writeServiceError(w, err)
 		return
 	}
 
@@ -1033,11 +1065,14 @@ func (s *Server) handleDeleteCategory(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := s.renderer.RenderCategoryDeleteOOB(w, id); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		writeServiceError(w, err)
 	}
 }
 
-func (s *Server) handleDeleteTask(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleDeleteTask(
+	w http.ResponseWriter,
+	r *http.Request,
+) {
 	auth, ok := s.requireAuth(w, r)
 	if !ok {
 		return
@@ -1050,13 +1085,9 @@ func (s *Server) handleDeleteTask(w http.ResponseWriter, r *http.Request) {
 	ctx := parseRequestContext(r)
 	id := r.PathValue("id")
 
-	task, err := s.store.DeleteTask(account.ID, id)
+	task, err := s.service.DeleteProject(service.DeleteProjectInput{AccountID: account.ID, ID: id})
 	if err != nil {
-		if strings.Contains(strings.ToLower(err.Error()), "not found") {
-			http.Error(w, err.Error(), http.StatusNotFound)
-			return
-		}
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		writeServiceError(w, err)
 		return
 	}
 
@@ -1066,9 +1097,9 @@ func (s *Server) handleDeleteTask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Re-fetch category after deletion and render it as OOB
-	cat, err := s.store.GetCategory(account.ID, task.CategoryID)
+	cat, err := s.service.GetCategory(service.GetCategoryInput{AccountID: account.ID, ID: task.CategoryID, Viewer: service.OwnerViewer()})
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		writeServiceError(w, err)
 		return
 	}
 
@@ -1076,13 +1107,16 @@ func (s *Server) handleDeleteTask(w http.ResponseWriter, r *http.Request) {
 	catView := NewCategoryView(cat, true, auth)
 	var buf bytes.Buffer
 	if err := s.renderer.RenderCategoryOOB(&buf, catView); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		writeServiceError(w, err)
 		return
 	}
 	w.Write(buf.Bytes())
 }
 
-func (s *Server) handleDeleteSubtask(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleDeleteSubtask(
+	w http.ResponseWriter,
+	r *http.Request,
+) {
 	auth, ok := s.requireAuth(w, r)
 	if !ok {
 		return
@@ -1095,13 +1129,9 @@ func (s *Server) handleDeleteSubtask(w http.ResponseWriter, r *http.Request) {
 	ctx := parseRequestContext(r)
 	id := r.PathValue("id")
 
-	sub, err := s.store.DeleteSubtask(account.ID, id)
+	sub, err := s.service.DeleteTask(service.DeleteTaskInput{AccountID: account.ID, ID: id})
 	if err != nil {
-		if strings.Contains(strings.ToLower(err.Error()), "not found") {
-			http.Error(w, err.Error(), http.StatusNotFound)
-			return
-		}
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		writeServiceError(w, err)
 		return
 	}
 
@@ -1111,9 +1141,9 @@ func (s *Server) handleDeleteSubtask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Re-fetch category after deletion and render it as OOB
-	cat, err := s.store.GetCategory(account.ID, sub.CategoryID)
+	cat, err := s.service.GetCategory(service.GetCategoryInput{AccountID: account.ID, ID: sub.CategoryID, Viewer: service.OwnerViewer()})
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		writeServiceError(w, err)
 		return
 	}
 
@@ -1121,13 +1151,16 @@ func (s *Server) handleDeleteSubtask(w http.ResponseWriter, r *http.Request) {
 	catView := NewCategoryView(cat, true, auth)
 	var buf bytes.Buffer
 	if err := s.renderer.RenderCategoryOOB(&buf, catView); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		writeServiceError(w, err)
 		return
 	}
 	w.Write(buf.Bytes())
 }
 
-func (s *Server) handleCreateTaskWorkLog(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleCreateTaskWorkLog(
+	w http.ResponseWriter,
+	r *http.Request,
+) {
 	auth, ok := s.requireAuth(w, r)
 	if !ok {
 		return
@@ -1169,9 +1202,17 @@ func (s *Server) handleCreateTaskWorkLog(w http.ResponseWriter, r *http.Request)
 		}
 	}
 
-	workLog, err := s.store.AddWorkLogForTask(account.ID, taskID, hoursWorked, workDescription, completionEstimate, customTime)
+	workLogInput := service.AddProjectWorkLogInput{
+		AccountID:          account.ID,
+		ProjectID:          taskID,
+		HoursWorked:        hoursWorked,
+		WorkDescription:    workDescription,
+		CompletionEstimate: completionEstimate,
+		CreatedAt:          customTime,
+	}
+	workLog, err := s.service.AddProjectWorkLog(workLogInput)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		writeServiceError(w, err)
 		return
 	}
 
@@ -1181,38 +1222,41 @@ func (s *Server) handleCreateTaskWorkLog(w http.ResponseWriter, r *http.Request)
 	}
 
 	// Re-fetch category and render as OOB
-	cat, err := s.store.GetCategory(account.ID, workLog.CategoryID)
+	cat, err := s.service.GetCategory(service.GetCategoryInput{AccountID: account.ID, ID: workLog.CategoryID, Viewer: service.OwnerViewer()})
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		writeServiceError(w, err)
 		return
 	}
 
 	catView := NewCategoryView(cat, true, auth)
 	if err := s.renderer.RenderCategoryOOB(w, catView); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		writeServiceError(w, err)
 		return
 	}
 
 	// Re-fetch task with work logs and render slideover OOB update
-	task, err := s.store.GetTask(account.ID, taskID)
+	task, err := s.service.GetProject(service.GetProjectInput{AccountID: account.ID, ID: taskID, Viewer: service.OwnerViewer()})
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		writeServiceError(w, err)
 		return
 	}
-	taskWorkLogs, err := s.store.GetWorkLogsForTask(account.ID, taskID)
+	taskWorkLogs, err := s.service.ListProjectWorkLogs(service.ListProjectWorkLogsInput{AccountID: account.ID, ProjectID: taskID})
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		writeServiceError(w, err)
 		return
 	}
 	task.WorkLogs = taskWorkLogs
 
 	taskView := NewTaskView(task, false, auth)
 	if err := s.renderer.RenderSlideoverWithDetails(w, taskView); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		writeServiceError(w, err)
 	}
 }
 
-func (s *Server) handleCreateSubtaskWorkLog(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleCreateSubtaskWorkLog(
+	w http.ResponseWriter,
+	r *http.Request,
+) {
 	auth, ok := s.requireAuth(w, r)
 	if !ok {
 		return
@@ -1254,9 +1298,17 @@ func (s *Server) handleCreateSubtaskWorkLog(w http.ResponseWriter, r *http.Reque
 		}
 	}
 
-	workLog, err := s.store.AddWorkLogForSubtask(account.ID, subtaskID, hoursWorked, workDescription, completionEstimate, customTime)
+	workLogInput := service.AddTaskWorkLogInput{
+		AccountID:          account.ID,
+		TaskID:             subtaskID,
+		HoursWorked:        hoursWorked,
+		WorkDescription:    workDescription,
+		CompletionEstimate: completionEstimate,
+		CreatedAt:          customTime,
+	}
+	workLog, err := s.service.AddTaskWorkLog(workLogInput)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		writeServiceError(w, err)
 		return
 	}
 
@@ -1266,33 +1318,33 @@ func (s *Server) handleCreateSubtaskWorkLog(w http.ResponseWriter, r *http.Reque
 	}
 
 	// Re-fetch category and render as OOB
-	cat, err := s.store.GetCategory(account.ID, workLog.CategoryID)
+	cat, err := s.service.GetCategory(service.GetCategoryInput{AccountID: account.ID, ID: workLog.CategoryID, Viewer: service.OwnerViewer()})
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		writeServiceError(w, err)
 		return
 	}
 
 	catView := NewCategoryView(cat, true, auth)
 	if err := s.renderer.RenderCategoryOOB(w, catView); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		writeServiceError(w, err)
 		return
 	}
 
 	// Re-fetch subtask with work logs and render slideover OOB update
-	sub, err := s.store.GetSubtask(account.ID, subtaskID)
+	sub, err := s.service.GetTask(service.GetTaskInput{AccountID: account.ID, ID: subtaskID, Viewer: service.OwnerViewer()})
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		writeServiceError(w, err)
 		return
 	}
-	subWorkLogs, err := s.store.GetWorkLogsForSubtask(account.ID, subtaskID)
+	subWorkLogs, err := s.service.ListTaskWorkLogs(service.ListTaskWorkLogsInput{AccountID: account.ID, TaskID: subtaskID})
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		writeServiceError(w, err)
 		return
 	}
 	sub.WorkLogs = subWorkLogs
 
 	subtaskView := NewSubtaskView(sub, false, auth)
 	if err := s.renderer.RenderSlideoverWithDetails(w, subtaskView); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		writeServiceError(w, err)
 	}
 }

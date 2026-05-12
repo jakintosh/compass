@@ -1,4 +1,4 @@
-package domain
+package service
 
 import "time"
 
@@ -14,21 +14,21 @@ type Store interface {
 	DeleteCategory(accountID string, id string) (*Category, error)
 	ReorderCategories(accountID string, ids []string) error
 
+	GetProject(accountID string, id string) (*Project, error)
+	AddProject(accountID string, catID string, name string) (*Project, error)
+	UpdateProject(accountID string, project *Project) (*Project, error)
+	DeleteProject(accountID string, id string) (*Project, error)
+	ReorderProjects(accountID string, catID string, projectIDs []string) error
+
 	GetTask(accountID string, id string) (*Task, error)
-	AddTask(accountID string, catID string, name string) (*Task, error)
+	AddTask(accountID string, projectID string, name string) (*Task, error)
 	UpdateTask(accountID string, task *Task) (*Task, error)
 	DeleteTask(accountID string, id string) (*Task, error)
-	ReorderTasks(accountID string, catID string, taskIDs []string) error
+	ReorderTasks(accountID string, projectID string, taskIDs []string) error
 
-	GetSubtask(accountID string, id string) (*Subtask, error)
-	AddSubtask(accountID string, taskID string, name string) (*Subtask, error)
-	UpdateSubtask(accountID string, sub *Subtask) (*Subtask, error)
-	DeleteSubtask(accountID string, id string) (*Subtask, error)
-	ReorderSubtasks(accountID string, taskID string, subIDs []string) error
-
+	AddWorkLogForProject(accountID string, projectID string, hoursWorked float64, workDescription string, completionEstimate int, customTime *time.Time) (*WorkLog, error)
 	AddWorkLogForTask(accountID string, taskID string, hoursWorked float64, workDescription string, completionEstimate int, customTime *time.Time) (*WorkLog, error)
-	AddWorkLogForSubtask(accountID string, subtaskID string, hoursWorked float64, workDescription string, completionEstimate int, customTime *time.Time) (*WorkLog, error)
-	GetWorkLogsForSubtask(accountID string, subtaskID string) ([]*WorkLog, error)
 	GetWorkLogsForTask(accountID string, taskID string) ([]*WorkLog, error)
+	GetWorkLogsForProject(accountID string, projectID string) ([]*WorkLog, error)
 	GetWorkLogsForCategory(accountID string, categoryID string) ([]*WorkLog, error)
 }

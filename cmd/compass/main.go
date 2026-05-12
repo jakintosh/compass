@@ -13,7 +13,9 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"time"
 
+	"git.sr.ht/~jakintosh/compass/internal/service"
 	"git.sr.ht/~jakintosh/compass/internal/store"
 	"git.sr.ht/~jakintosh/compass/internal/web"
 	"git.sr.ht/~jakintosh/consent/pkg/client"
@@ -24,7 +26,10 @@ import (
 var consentScopes = []string{"identity", "profile"}
 
 // getConfigValue returns the CLI flag value if set, otherwise falls back to env var.
-func getConfigValue(flagVal, envKey string) string {
+func getConfigValue(
+	flagVal,
+	envKey string,
+) string {
 	if flagVal != "" {
 		return flagVal
 	}
@@ -57,6 +62,15 @@ func main() {
 	store, err := store.NewSQLiteStore("compass.db", true)
 	if err != nil {
 		log.Fatalf("Failed to initialize store: %v", err)
+	}
+
+	serviceOpts := service.Options{
+		Store: store,
+		Clock: time.Now,
+	}
+	svc, err := service.New(serviceOpts)
+	if err != nil {
+		log.Fatalf("Failed to initialize service: %v", err)
 	}
 
 	// Configure authentication based on mode
@@ -137,7 +151,7 @@ func main() {
 	}
 
 	opts := web.ServerOptions{Auth: authConfig}
-	srv, err := web.NewServer(store, opts)
+	srv, err := web.NewServer(svc, opts)
 	if err != nil {
 		log.Fatalf("Failed to initialize server: %v", err)
 	}
@@ -162,7 +176,13 @@ type productionAppConfig struct {
 	logoURL     string
 }
 
-func normalizeConsentURL(raw string) (baseURL string, issuerDomain string, err error) {
+func normalizeConsentURL(
+	raw string,
+) (
+	baseURL string,
+	issuerDomain string,
+	err error,
+) {
 	parsed, err := parseAbsoluteURL(raw)
 	if err != nil {
 		return "", "", err
@@ -173,7 +193,12 @@ func normalizeConsentURL(raw string) (baseURL string, issuerDomain string, err e
 	return (&url.URL{Scheme: parsed.Scheme, Host: parsed.Host}).String(), parsed.Host, nil
 }
 
-func buildProductionAppConfig(rawPublicURL string) (productionAppConfig, error) {
+func buildProductionAppConfig(
+	rawPublicURL string,
+) (
+	productionAppConfig,
+	error,
+) {
 	parsed, err := parseAbsoluteURL(rawPublicURL)
 	if err != nil {
 		return productionAppConfig{}, err
@@ -192,7 +217,12 @@ func buildProductionAppConfig(rawPublicURL string) (productionAppConfig, error) 
 	}, nil
 }
 
-func parseAbsoluteURL(raw string) (*url.URL, error) {
+func parseAbsoluteURL(
+	raw string,
+) (
+	*url.URL,
+	error,
+) {
 	parsed, err := url.Parse(strings.TrimSpace(raw))
 	if err != nil || parsed == nil {
 		return nil, fmt.Errorf("expected absolute URL with scheme and host")
@@ -206,7 +236,10 @@ func parseAbsoluteURL(raw string) (*url.URL, error) {
 	return parsed, nil
 }
 
-func buildAuthorizeURL(consentURL string, integrationName string) string {
+func buildAuthorizeURL(
+	consentURL string,
+	integrationName string,
+) string {
 	authorizeURL, err := url.Parse(strings.TrimRight(consentURL, "/") + "/authorize")
 	if err != nil {
 		return "/"
@@ -221,7 +254,12 @@ func buildAuthorizeURL(consentURL string, integrationName string) string {
 }
 
 // parsePublicKey parses a PEM-encoded ECDSA public key.
-func parsePublicKey(pemData string) (*ecdsa.PublicKey, error) {
+func parsePublicKey(
+	pemData string,
+) (
+	*ecdsa.PublicKey,
+	error,
+) {
 	block, _ := pem.Decode([]byte(pemData))
 	if block == nil {
 		return nil, fmt.Errorf("failed to decode PEM block")
@@ -242,7 +280,12 @@ func parsePublicKey(pemData string) (*ecdsa.PublicKey, error) {
 
 // getOrGenerateDevKey attempts to load a private key from the given filename.
 // If the file does not exist, it generates a new key and saves it.
-func getOrGenerateDevKey(filename string) (*ecdsa.PrivateKey, error) {
+func getOrGenerateDevKey(
+	filename string,
+) (
+	*ecdsa.PrivateKey,
+	error,
+) {
 	// Try to read existing key
 	data, err := os.ReadFile(filename)
 	if err == nil {

@@ -11,7 +11,9 @@ type RequestContext struct {
 	Boosted     bool   // HX-Boosted - was this a boosted link/form?
 }
 
-func parseRequestContext(r *http.Request) RequestContext {
+func parseRequestContext(
+	r *http.Request,
+) RequestContext {
 	return RequestContext{
 		IsHTMX:      r.Header.Get("HX-Request") == "true",
 		CurrentURL:  r.Header.Get("HX-Current-URL"),
