@@ -9,7 +9,7 @@ build:
 # Run tests
 test: build
 	@echo "Running tests..."
-	@go test -v ./...
+	@go test ./...
 
 # Run the application
 run: build

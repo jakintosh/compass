@@ -15,8 +15,8 @@ import (
 	"strings"
 	"time"
 
+	"git.sr.ht/~jakintosh/compass/internal/database"
 	"git.sr.ht/~jakintosh/compass/internal/service"
-	"git.sr.ht/~jakintosh/compass/internal/store"
 	"git.sr.ht/~jakintosh/compass/internal/web"
 	"git.sr.ht/~jakintosh/consent/pkg/client"
 	contesting "git.sr.ht/~jakintosh/consent/pkg/testing"
@@ -58,14 +58,18 @@ func main() {
 	}
 	resolvedPublicURL := getConfigValue(*publicURL, "PUBLIC_URL")
 
-	// Initialize Store
-	store, err := store.NewSQLiteStore("compass.db", true)
+	// Initialize database
+	databaseOpts := database.Options{
+		Path: "compass.db",
+		WAL:  true,
+	}
+	db, err := database.Open(databaseOpts)
 	if err != nil {
-		log.Fatalf("Failed to initialize store: %v", err)
+		log.Fatalf("Failed to initialize database: %v", err)
 	}
 
 	serviceOpts := service.Options{
-		Store: store,
+		Store: db,
 		Clock: time.Now,
 	}
 	svc, err := service.New(serviceOpts)
