@@ -20,15 +20,15 @@ func (db *DB) GetTask(
 	err := db.Conn.QueryRow(
 		`SELECT
 			s.id,
-			s.task_id,
+			s.project_id,
 			s.category_id,
 			s.name,
 			s.description,
 			s.completion,
 			s.public,
 			(c.public AND t.public) AS parent_public
-		FROM subtasks s
-		JOIN tasks t ON s.task_id = t.id
+		FROM tasks s
+		JOIN projects t ON s.project_id = t.id
 		JOIN categories c ON s.category_id = c.id
 		WHERE s.account_id = ?1 AND s.id = ?2`,
 		accountID,
@@ -68,8 +68,8 @@ func (db *DB) AddTask(
 	var maxOrder sql.NullInt64
 	if err := tx.QueryRow(`
 		SELECT MAX(sort_order)
-		FROM subtasks
-		WHERE account_id = ?1 AND task_id = ?2`,
+		FROM tasks
+		WHERE account_id = ?1 AND project_id = ?2`,
 		accountID,
 		projectID,
 	).Scan(&maxOrder); err != nil {
@@ -79,13 +79,13 @@ func (db *DB) AddTask(
 
 	var sub service.Task
 	if err := tx.QueryRow(`
-		INSERT INTO subtasks (id, account_id, task_id, category_id, name, sort_order)
+		INSERT INTO tasks (id, account_id, project_id, category_id, name, sort_order)
 		SELECT ?1, ?2, id, category_id, ?4, ?5
-		FROM tasks
+		FROM projects
 		WHERE account_id = ?2 AND id = ?3
 		RETURNING
 			id,
-			task_id,
+			project_id,
 			category_id,
 			name,
 			description,
@@ -124,7 +124,7 @@ func (db *DB) UpdateTask(
 ) {
 	var updated service.Task
 	if err := db.Conn.QueryRow(`
-		UPDATE subtasks
+		UPDATE tasks
 		SET name = ?1,
 			description = ?2,
 			completion = ?3,
@@ -132,7 +132,7 @@ func (db *DB) UpdateTask(
 		WHERE account_id = ?5 AND id = ?6
 		RETURNING
 			id,
-			task_id,
+			project_id,
 			category_id,
 			name,
 			description,
@@ -168,11 +168,11 @@ func (db *DB) DeleteTask(
 ) {
 	var removed service.Task
 	if err := db.Conn.QueryRow(`
-		DELETE FROM subtasks
+		DELETE FROM tasks
 		WHERE account_id = ?1 AND id = ?2
 		RETURNING
 			id,
-			task_id,
+			project_id,
 			category_id,
 			name,
 			description,
@@ -209,9 +209,9 @@ func (db *DB) ReorderTasks(
 
 	for i, id := range taskIDs {
 		if _, err := tx.Exec(`
-			UPDATE subtasks
+			UPDATE tasks
 			SET sort_order = ?1
-			WHERE account_id = ?2 AND id = ?3 AND task_id = ?4`,
+			WHERE account_id = ?2 AND id = ?3 AND project_id = ?4`,
 			i,
 			accountID,
 			id,

@@ -1,5 +1,3 @@
-bin/
-docs/
-*.db*
-dev.key
+/bin/
+/data/
 version_generated.go

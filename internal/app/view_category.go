@@ -1,4 +1,4 @@
-package web
+package app
 
 import (
 	"io"
@@ -14,7 +14,7 @@ type CategoryView struct {
 	Description       string
 	Public            bool
 	AverageCompletion int
-	Tasks             []TaskView
+	Projects          []ProjectView
 	WorkLogs          []WorkLogView
 	OOB               bool
 	DeleteButton      DeleteButtonView
@@ -37,15 +37,15 @@ func NewCategoryView(
 		WorkLogs:          NewWorkLogViewsFromCategory(c),
 	}
 	if len(c.Projects) > 0 {
-		view.Tasks = make([]TaskView, len(c.Projects))
+		view.Projects = make([]ProjectView, len(c.Projects))
 		for i, p := range c.Projects {
-			view.Tasks[i] = NewTaskView(p, false, auth)
+			view.Projects[i] = NewProjectView(p, false, auth)
 		}
 	}
 
 	view.DeleteButton = DeleteButtonView{
 		URL:            auth.BasePath + "/categories/" + c.ID + "?csrf=" + auth.CSRFToken,
-		ConfirmMessage: "Delete this category and all its tasks?",
+		ConfirmMessage: "Delete this category and all its projects?",
 		ButtonText:     "Delete Category",
 	}
 

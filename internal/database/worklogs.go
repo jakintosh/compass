@@ -105,7 +105,7 @@ func (db *DB) GetWorkLogsForTask(
 	error,
 ) {
 	return db.getWorkLogs(
-		`subtask_id = ?2`,
+		`task_id = ?2`,
 		accountID,
 		taskID,
 	)
@@ -119,7 +119,7 @@ func (db *DB) GetWorkLogsForProject(
 	error,
 ) {
 	return db.getWorkLogs(
-		`task_id = ?2`,
+		`project_id = ?2`,
 		accountID,
 		projectID,
 	)
@@ -166,8 +166,8 @@ func (db *DB) sqlInsertProjectWorkLogTx(
 			id,
 			account_id,
 			category_id,
+			project_id,
 			task_id,
-			subtask_id,
 			hours_worked,
 			work_description,
 			completion_estimate,
@@ -183,13 +183,13 @@ func (db *DB) sqlInsertProjectWorkLogTx(
 			?5,
 			?6,
 			?7
-		FROM tasks
+		FROM projects
 		WHERE account_id = ?2 AND id = ?3
 		RETURNING
 			id,
 			category_id,
+			project_id,
 			task_id,
-			subtask_id,
 			hours_worked,
 			work_description,
 			completion_estimate,
@@ -229,8 +229,8 @@ func (db *DB) sqlInsertTaskWorkLogTx(
 			id,
 			account_id,
 			category_id,
+			project_id,
 			task_id,
-			subtask_id,
 			hours_worked,
 			work_description,
 			completion_estimate,
@@ -240,19 +240,19 @@ func (db *DB) sqlInsertTaskWorkLogTx(
 			?1,
 			?2,
 			category_id,
-			task_id,
+			project_id,
 			?3,
 			?4,
 			?5,
 			?6,
 			?7
-		FROM subtasks
+		FROM tasks
 		WHERE account_id = ?2 AND id = ?3
 		RETURNING
 			id,
 			category_id,
+			project_id,
 			task_id,
-			subtask_id,
 			hours_worked,
 			work_description,
 			completion_estimate,
@@ -281,7 +281,7 @@ func (db *DB) sqlUpdateProjectCompletionTx(
 	completionEstimate int,
 ) error {
 	if _, err := tx.Exec(`
-		UPDATE tasks
+		UPDATE projects
 		SET completion = ?1
 		WHERE account_id = ?2 AND id = ?3`,
 		completionEstimate,
@@ -300,7 +300,7 @@ func (db *DB) sqlUpdateTaskCompletionTx(
 	completionEstimate int,
 ) error {
 	if _, err := tx.Exec(`
-		UPDATE subtasks
+		UPDATE tasks
 		SET completion = ?1
 		WHERE account_id = ?2 AND id = ?3`,
 		completionEstimate,
@@ -324,8 +324,8 @@ func (db *DB) getWorkLogs(
 		SELECT
 			id,
 			category_id,
+			project_id,
 			task_id,
-			subtask_id,
 			hours_worked,
 			work_description,
 			completion_estimate,
@@ -354,12 +354,12 @@ func scanWorkLog(
 ) {
 	var workLog service.WorkLog
 	var createdAt int64
-	var subtaskID sql.NullString
+	var taskID sql.NullString
 	if err := row.Scan(
 		&workLog.ID,
 		&workLog.CategoryID,
 		&workLog.ProjectID,
-		&subtaskID,
+		&taskID,
 		&workLog.HoursWorked,
 		&workLog.WorkDescription,
 		&workLog.CompletionEstimate,
@@ -367,7 +367,7 @@ func scanWorkLog(
 	); err != nil {
 		return nil, err
 	}
-	workLog.TaskID = subtaskID.String
+	workLog.TaskID = taskID.String
 	workLog.CreatedAt = time.Unix(createdAt, 0)
 	return &workLog, nil
 }
@@ -382,12 +382,12 @@ func scanWorkLogRows(
 	for rows.Next() {
 		var workLog service.WorkLog
 		var createdAt int64
-		var subtaskID sql.NullString
+		var taskID sql.NullString
 		if err := rows.Scan(
 			&workLog.ID,
 			&workLog.CategoryID,
 			&workLog.ProjectID,
-			&subtaskID,
+			&taskID,
 			&workLog.HoursWorked,
 			&workLog.WorkDescription,
 			&workLog.CompletionEstimate,
@@ -395,7 +395,7 @@ func scanWorkLogRows(
 		); err != nil {
 			return nil, fmt.Errorf("scan work log row: %w", err)
 		}
-		workLog.TaskID = subtaskID.String
+		workLog.TaskID = taskID.String
 		workLog.CreatedAt = time.Unix(createdAt, 0)
 		logs = append(logs, &workLog)
 	}

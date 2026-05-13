@@ -49,14 +49,14 @@
         </div>
     </div>
 
-    <ul class="tasks-list" id="tasks-list-{{.ID}}" data-category-id="{{.ID}}">
-        {{range .Tasks}} {{template "task.html" .}} {{end}}
+    <ul class="projects-list" id="projects-list-{{.ID}}" data-category-id="{{.ID}}">
+        {{range .Projects}} {{template "project.html" .}} {{end}}
 
         {{if .CanWrite}}
         <li class="row add-item">
-            <button class="btn btn-add" hx-post="{{.BasePath}}/categories/{{.ID}}/tasks?csrf={{.CSRFToken}}" hx-target="closest li" hx-swap="beforebegin">
+            <button class="btn btn-add" hx-post="{{.BasePath}}/categories/{{.ID}}/projects?csrf={{.CSRFToken}}" hx-target="closest li" hx-swap="beforebegin">
                 <span class="arrow">→</span>
-                <span>Add a task</span>
+                <span>Add a project</span>
             </button>
         </li>
         {{end}}

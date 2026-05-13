@@ -1,4 +1,4 @@
-package web
+package app
 
 import (
 	"bytes"
@@ -10,12 +10,12 @@ import (
 	"strings"
 	"time"
 
+	"git.sr.ht/~jakintosh/command-go/pkg/wire"
 	"git.sr.ht/~jakintosh/compass/internal/service"
 	"git.sr.ht/~jakintosh/consent/pkg/client"
 )
 
-// AuthConfig configures authentication for the server.
-// When nil is passed to ServerOptions, the server runs without auth capability.
+// AuthConfig configures authentication for the rendered app.
 type AuthConfig struct {
 	// Verifier validates access tokens
 	Verifier client.Verifier
@@ -34,34 +34,30 @@ type AuthConfig struct {
 
 	// LogoutURL is where the logout button should send users
 	LogoutURL string
-
-	// Routes are mode-specific handlers to register (e.g., /dev/login, /auth/callback)
-	Routes map[string]http.HandlerFunc
 }
 
-// ServerOptions configures the web server
-type ServerOptions struct {
-	Auth AuthConfig // Required; Verifier must be non-nil
+// Options configures the rendered app.
+type Options struct {
+	Service *service.Service
+	Auth    AuthConfig
 }
 
-type Server struct {
+type App struct {
 	service  *service.Service
-	router   *http.ServeMux
 	renderer *Renderer
 	auth     AuthConfig
 }
 
-func NewServer(
-	svc *service.Service,
-	opts ServerOptions,
+func New(
+	opts Options,
 ) (
-	*Server,
+	*App,
 	error,
 ) {
 	if opts.Auth.Verifier == nil {
 		return nil, errors.New("Auth.Verifier is required")
 	}
-	if svc == nil {
+	if opts.Service == nil {
 		return nil, errors.New("service is required")
 	}
 
@@ -69,192 +65,125 @@ func NewServer(
 	if err != nil {
 		return nil, err
 	}
-	s := &Server{
-		service:  svc,
-		router:   http.NewServeMux(),
+	app := &App{
+		service:  opts.Service,
 		renderer: renderer,
 		auth:     opts.Auth,
 	}
-	s.routes()
-	return s, nil
+	return app, nil
 }
 
-func (s *Server) ServeHTTP(
-	w http.ResponseWriter,
-	r *http.Request,
-) {
-	s.router.ServeHTTP(w, r)
+func (s *App) Handler() http.Handler {
+	root := http.NewServeMux()
+
+	wire.Subrouter(root, "/static", s.buildStaticRouter())
+	wire.Subrouter(root, "/", s.buildPageRouter())
+
+	return root
 }
 
-func (s *Server) routes() {
-	// Static Files
-	fs := http.FileServer(http.Dir("internal/web/static"))
-	s.router.Handle("GET /static/", http.StripPrefix("/static/", fs))
-
-	// Auth routes (mode-specific: /dev/login, /dev/logout, /auth/callback, etc.)
-	for path, handler := range s.auth.Routes {
-		s.router.HandleFunc(path, handler)
-	}
-
-	// Page Routes
-	s.router.HandleFunc("GET /{$}", s.handleIndex)
-
-	s.router.HandleFunc("/", s.handleTenantRoute)
+func (s *App) buildStaticRouter() http.Handler {
+	return http.FileServer(http.Dir("internal/app/static"))
 }
 
-func (s *Server) handleTenantRoute(
-	w http.ResponseWriter,
-	r *http.Request,
-) {
-	path := r.URL.Path
-	path = strings.Trim(path, "/")
-	segments := strings.Split(path, "/")
-	if len(segments) == 0 || segments[0] == "" {
-		http.NotFound(w, r)
-		return
-	}
-	switch segments[0] {
-	case "static", "auth", "dev", ".well-known":
-		http.NotFound(w, r)
-		return
-	}
+func (s *App) buildPageRouter() http.Handler {
+	mux := http.NewServeMux()
 
-	r.SetPathValue("handle", segments[0])
-	if len(segments) == 1 && r.Method == http.MethodGet {
-		s.handleTenantIndex(w, r)
-		return
-	}
+	mux.HandleFunc("GET /{$}", s.handleIndex)
+	mux.Handle("/", s.withTenantPath(s.buildTenantRouter()))
 
-	if len(segments) < 2 {
-		http.NotFound(w, r)
-		return
-	}
-
-	switch segments[1] {
-	case "categories":
-		s.dispatchCategoryRoute(w, r, segments)
-	case "tasks":
-		s.dispatchTaskRoute(w, r, segments)
-	case "subtasks":
-		s.dispatchSubtaskRoute(w, r, segments)
-	default:
-		http.NotFound(w, r)
-	}
+	return mux
 }
 
-func (s *Server) dispatchCategoryRoute(
-	w http.ResponseWriter,
-	r *http.Request,
-	segments []string,
-) {
-	if len(segments) == 2 && r.Method == http.MethodPost {
-		s.handleCreateCategory(w, r)
-		return
-	}
-	if len(segments) == 3 && segments[2] == "reorder" && r.Method == http.MethodPost {
-		s.handleReorderCategories(w, r)
-		return
-	}
-	if len(segments) >= 3 {
-		r.SetPathValue("id", segments[2])
-	}
-	if len(segments) == 3 {
-		switch r.Method {
-		case http.MethodPatch:
-			s.handleUpdateCategory(w, r)
-		case http.MethodDelete:
-			s.handleDeleteCategory(w, r)
-		default:
+func (s *App) buildTenantRouter() http.Handler {
+	mux := http.NewServeMux()
+
+	mux.HandleFunc("GET /{$}", s.handleTenantIndex)
+	wire.Subrouter(mux, "/categories", s.buildCategoryRouter())
+	wire.Subrouter(mux, "/projects", s.buildProjectRouter())
+	wire.Subrouter(mux, "/tasks", s.buildTaskRouter())
+
+	return mux
+}
+
+func (s *App) buildCategoryRouter() http.Handler {
+	mux := http.NewServeMux()
+
+	mux.HandleFunc("POST /", s.handleCreateCategory)
+	mux.HandleFunc("POST /reorder", s.handleReorderCategories)
+	mux.HandleFunc("PATCH /{id}", s.handleUpdateCategory)
+	mux.HandleFunc("DELETE /{id}", s.handleDeleteCategory)
+	mux.HandleFunc("GET /{id}/details", s.handleGetCategoryDetails)
+	mux.HandleFunc("POST /{id}/projects", s.handleCreateProject)
+
+	return mux
+}
+
+func (s *App) buildProjectRouter() http.Handler {
+	mux := http.NewServeMux()
+
+	mux.HandleFunc("POST /reorder", s.handleReorderProjects)
+	mux.HandleFunc("PATCH /{id}", s.handleUpdateProject)
+	mux.HandleFunc("DELETE /{id}", s.handleDeleteProject)
+	mux.HandleFunc("GET /{id}/details", s.handleGetProjectDetails)
+	mux.HandleFunc("POST /{id}/tasks", s.handleCreateTask)
+	mux.HandleFunc("POST /{id}/work-logs", s.handleCreateProjectWorkLog)
+
+	return mux
+}
+
+func (s *App) buildTaskRouter() http.Handler {
+	mux := http.NewServeMux()
+
+	mux.HandleFunc("POST /reorder", s.handleReorderTasks)
+	mux.HandleFunc("PATCH /{id}", s.handleUpdateTask)
+	mux.HandleFunc("DELETE /{id}", s.handleDeleteTask)
+	mux.HandleFunc("GET /{id}/details", s.handleGetTaskDetails)
+	mux.HandleFunc("POST /{id}/work-logs", s.handleCreateTaskWorkLog)
+
+	return mux
+}
+
+func (s *App) withTenantPath(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		path := strings.TrimPrefix(r.URL.Path, "/")
+		if path == "" {
 			http.NotFound(w, r)
+			return
 		}
-		return
-	}
-	if len(segments) == 4 && segments[3] == "details" && r.Method == http.MethodGet {
-		s.handleGetCategoryDetails(w, r)
-		return
-	}
-	if len(segments) == 4 && segments[3] == "tasks" && r.Method == http.MethodPost {
-		s.handleCreateTask(w, r)
-		return
-	}
-	http.NotFound(w, r)
+
+		handleSegment, tenantPath, _ := strings.Cut(path, "/")
+		switch handleSegment {
+		case "static", "auth", "dev", ".well-known":
+			http.NotFound(w, r)
+			return
+		}
+
+		handle, err := url.PathUnescape(handleSegment)
+		if err != nil {
+			http.Error(w, "Bad request", http.StatusBadRequest)
+			return
+		}
+
+		r2 := r.Clone(r.Context())
+		r2.URL.Path = tenantURLPath(tenantPath)
+		r2.URL.RawPath = ""
+		r2.SetPathValue("handle", handle)
+
+		next.ServeHTTP(w, r2)
+	})
 }
 
-func (s *Server) dispatchTaskRoute(
-	w http.ResponseWriter,
-	r *http.Request,
-	segments []string,
-) {
-	if len(segments) == 3 && segments[2] == "reorder" && r.Method == http.MethodPost {
-		s.handleReorderTasks(w, r)
-		return
+func tenantURLPath(tenantPath string) string {
+	if tenantPath == "" {
+		return "/"
 	}
-	if len(segments) >= 3 {
-		r.SetPathValue("id", segments[2])
-	}
-	if len(segments) == 3 {
-		switch r.Method {
-		case http.MethodPatch:
-			s.handleUpdateTask(w, r)
-		case http.MethodDelete:
-			s.handleDeleteTask(w, r)
-		default:
-			http.NotFound(w, r)
-		}
-		return
-	}
-	if len(segments) == 4 && segments[3] == "details" && r.Method == http.MethodGet {
-		s.handleGetTaskDetails(w, r)
-		return
-	}
-	if len(segments) == 4 && segments[3] == "subtasks" && r.Method == http.MethodPost {
-		s.handleCreateSubtask(w, r)
-		return
-	}
-	if len(segments) == 4 && segments[3] == "work-logs" && r.Method == http.MethodPost {
-		s.handleCreateTaskWorkLog(w, r)
-		return
-	}
-	http.NotFound(w, r)
-}
-
-func (s *Server) dispatchSubtaskRoute(
-	w http.ResponseWriter,
-	r *http.Request,
-	segments []string,
-) {
-	if len(segments) == 3 && segments[2] == "reorder" && r.Method == http.MethodPost {
-		s.handleReorderSubtasks(w, r)
-		return
-	}
-	if len(segments) >= 3 {
-		r.SetPathValue("id", segments[2])
-	}
-	if len(segments) == 3 {
-		switch r.Method {
-		case http.MethodPatch:
-			s.handleUpdateSubtask(w, r)
-		case http.MethodDelete:
-			s.handleDeleteSubtask(w, r)
-		default:
-			http.NotFound(w, r)
-		}
-		return
-	}
-	if len(segments) == 4 && segments[3] == "details" && r.Method == http.MethodGet {
-		s.handleGetSubtaskDetails(w, r)
-		return
-	}
-	if len(segments) == 4 && segments[3] == "work-logs" && r.Method == http.MethodPost {
-		s.handleCreateSubtaskWorkLog(w, r)
-		return
-	}
-	http.NotFound(w, r)
+	return "/" + tenantPath
 }
 
 // getAuthContext attempts to verify auth and returns context with CSRF token.
 // Returns unauthenticated context if verification fails.
-func (s *Server) getAuthContext(
+func (s *App) getAuthContext(
 	w http.ResponseWriter,
 	r *http.Request,
 ) AuthContext {
@@ -287,7 +216,7 @@ func (s *Server) getAuthContext(
 
 // requireAuth verifies auth and CSRF for destructive operations.
 // Returns auth context and true if authorized, writes error response if not.
-func (s *Server) requireAuth(
+func (s *App) requireAuth(
 	w http.ResponseWriter,
 	r *http.Request,
 ) (
@@ -327,7 +256,7 @@ func (s *Server) requireAuth(
 	return auth, true
 }
 
-func (s *Server) handleIndex(
+func (s *App) handleIndex(
 	w http.ResponseWriter,
 	r *http.Request,
 ) {
@@ -342,7 +271,7 @@ func (s *Server) handleIndex(
 	}
 }
 
-func (s *Server) handleTenantIndex(
+func (s *App) handleTenantIndex(
 	w http.ResponseWriter,
 	r *http.Request,
 ) {
@@ -369,7 +298,7 @@ func (s *Server) handleTenantIndex(
 	}
 }
 
-func (s *Server) loginURL(
+func (s *App) loginURL(
 	r *http.Request,
 ) string {
 	if s.auth.LoginURL == "" {
@@ -387,7 +316,7 @@ func (s *Server) loginURL(
 	return loginURL.String()
 }
 
-func (s *Server) accountForToken(
+func (s *App) accountForToken(
 	accessToken *client.AccessToken,
 ) (
 	*service.Account,
@@ -426,7 +355,7 @@ func (s *Server) accountForToken(
 	return account, nil
 }
 
-func (s *Server) shouldRefreshProfile(
+func (s *App) shouldRefreshProfile(
 	account *service.Account,
 ) bool {
 	interval := s.auth.ProfileRefreshInterval
@@ -436,7 +365,7 @@ func (s *Server) shouldRefreshProfile(
 	return time.Since(account.ProfileRefreshedAt) >= interval
 }
 
-func (s *Server) resolveTenant(
+func (s *App) resolveTenant(
 	w http.ResponseWriter,
 	r *http.Request,
 	auth AuthContext,
@@ -487,7 +416,7 @@ func writeServiceError(
 	}
 }
 
-func (s *Server) handleCreateCategory(
+func (s *App) handleCreateCategory(
 	w http.ResponseWriter,
 	r *http.Request,
 ) {
@@ -523,7 +452,7 @@ func (s *Server) handleCreateCategory(
 	}
 }
 
-func (s *Server) handleUpdateCategory(
+func (s *App) handleUpdateCategory(
 	w http.ResponseWriter,
 	r *http.Request,
 ) {
@@ -574,7 +503,7 @@ func (s *Server) handleUpdateCategory(
 	}
 }
 
-func (s *Server) handleGetCategoryDetails(
+func (s *App) handleGetCategoryDetails(
 	w http.ResponseWriter,
 	r *http.Request,
 ) {
@@ -616,7 +545,7 @@ func (s *Server) handleGetCategoryDetails(
 	}
 }
 
-func (s *Server) handleCreateTask(
+func (s *App) handleCreateProject(
 	w http.ResponseWriter,
 	r *http.Request,
 ) {
@@ -632,7 +561,7 @@ func (s *Server) handleCreateTask(
 	ctx := parseRequestContext(r)
 	catID := r.PathValue("id")
 
-	task, err := s.service.CreateProject(service.CreateProjectInput{AccountID: account.ID, CategoryID: catID, Name: "New Task"})
+	project, err := s.service.CreateProject(service.CreateProjectInput{AccountID: account.ID, CategoryID: catID, Name: "New Project"})
 	if err != nil {
 		writeServiceError(w, err)
 		return
@@ -658,13 +587,13 @@ func (s *Server) handleCreateTask(
 	}
 	w.Write(buf.Bytes())
 
-	taskView := NewTaskView(task, false, auth)
-	if err := s.renderer.RenderSlideoverWithDetails(w, taskView); err != nil {
+	projectView := NewProjectView(project, false, auth)
+	if err := s.renderer.RenderSlideoverWithDetails(w, projectView); err != nil {
 		writeServiceError(w, err)
 	}
 }
 
-func (s *Server) handleUpdateTask(
+func (s *App) handleUpdateProject(
 	w http.ResponseWriter,
 	r *http.Request,
 ) {
@@ -704,7 +633,7 @@ func (s *Server) handleUpdateTask(
 		update.Public = &public
 	}
 
-	task, err := s.service.UpdateProject(update)
+	project, err := s.service.UpdateProject(update)
 	if err != nil {
 		writeServiceError(w, err)
 		return
@@ -716,7 +645,7 @@ func (s *Server) handleUpdateTask(
 	}
 
 	// Re-fetch category and render it as OOB
-	cat, err := s.service.GetCategory(service.GetCategoryInput{AccountID: account.ID, ID: task.CategoryID, Viewer: service.OwnerViewer()})
+	cat, err := s.service.GetCategory(service.GetCategoryInput{AccountID: account.ID, ID: project.CategoryID, Viewer: service.OwnerViewer()})
 	if err != nil {
 		writeServiceError(w, err)
 		return
@@ -731,7 +660,7 @@ func (s *Server) handleUpdateTask(
 	w.Write(buf.Bytes())
 }
 
-func (s *Server) handleGetSubtaskDetails(
+func (s *App) handleGetTaskDetails(
 	w http.ResponseWriter,
 	r *http.Request,
 ) {
@@ -743,51 +672,7 @@ func (s *Server) handleGetSubtaskDetails(
 	ctx := parseRequestContext(r)
 	id := r.PathValue("id")
 
-	sub, err := s.service.GetTaskWithWorkLogs(service.GetTaskInput{AccountID: account.ID, ID: id, Viewer: viewerFromAuth(auth)})
-	if err != nil {
-		writeServiceError(w, err)
-		return
-	}
-
-	subtaskView := NewSubtaskView(sub, false, auth)
-
-	if ctx.IsHTMX {
-		if err := s.renderer.RenderSubtaskDetails(w, subtaskView); err != nil {
-			writeServiceError(w, err)
-		}
-		return
-	}
-
-	// Deep Linking: Render full page with details open
-	cats, err := s.service.ListCategories(service.ListCategoriesInput{AccountID: account.ID, Viewer: viewerFromAuth(auth)})
-	if err != nil {
-		http.Error(w, "Failed to load categories", http.StatusInternalServerError)
-		return
-	}
-
-	catViews := make([]CategoryView, len(cats))
-	for i, c := range cats {
-		catViews[i] = NewCategoryView(c, false, auth)
-	}
-
-	if err := s.renderer.RenderIndexWithDetails(w, catViews, auth, subtaskView); err != nil {
-		writeServiceError(w, err)
-	}
-}
-
-func (s *Server) handleGetTaskDetails(
-	w http.ResponseWriter,
-	r *http.Request,
-) {
-	auth := s.getAuthContext(w, r)
-	account, auth, ok := s.resolveTenant(w, r, auth, false)
-	if !ok {
-		return
-	}
-	ctx := parseRequestContext(r)
-	id := r.PathValue("id")
-
-	task, err := s.service.GetProjectWithWorkLogs(service.GetProjectInput{AccountID: account.ID, ID: id, Viewer: viewerFromAuth(auth)})
+	task, err := s.service.GetTaskWithWorkLogs(service.GetTaskInput{AccountID: account.ID, ID: id, Viewer: viewerFromAuth(auth)})
 	if err != nil {
 		writeServiceError(w, err)
 		return
@@ -819,7 +704,51 @@ func (s *Server) handleGetTaskDetails(
 	}
 }
 
-func (s *Server) handleCreateSubtask(
+func (s *App) handleGetProjectDetails(
+	w http.ResponseWriter,
+	r *http.Request,
+) {
+	auth := s.getAuthContext(w, r)
+	account, auth, ok := s.resolveTenant(w, r, auth, false)
+	if !ok {
+		return
+	}
+	ctx := parseRequestContext(r)
+	id := r.PathValue("id")
+
+	project, err := s.service.GetProjectWithWorkLogs(service.GetProjectInput{AccountID: account.ID, ID: id, Viewer: viewerFromAuth(auth)})
+	if err != nil {
+		writeServiceError(w, err)
+		return
+	}
+
+	projectView := NewProjectView(project, false, auth)
+
+	if ctx.IsHTMX {
+		if err := s.renderer.RenderProjectDetails(w, projectView); err != nil {
+			writeServiceError(w, err)
+		}
+		return
+	}
+
+	// Deep Linking: Render full page with details open
+	cats, err := s.service.ListCategories(service.ListCategoriesInput{AccountID: account.ID, Viewer: viewerFromAuth(auth)})
+	if err != nil {
+		http.Error(w, "Failed to load categories", http.StatusInternalServerError)
+		return
+	}
+
+	catViews := make([]CategoryView, len(cats))
+	for i, c := range cats {
+		catViews[i] = NewCategoryView(c, false, auth)
+	}
+
+	if err := s.renderer.RenderIndexWithDetails(w, catViews, auth, projectView); err != nil {
+		writeServiceError(w, err)
+	}
+}
+
+func (s *App) handleCreateTask(
 	w http.ResponseWriter,
 	r *http.Request,
 ) {
@@ -833,9 +762,9 @@ func (s *Server) handleCreateSubtask(
 	}
 
 	ctx := parseRequestContext(r)
-	taskID := r.PathValue("id")
+	projectID := r.PathValue("id")
 
-	sub, err := s.service.CreateTask(service.CreateTaskInput{AccountID: account.ID, ProjectID: taskID, Name: "New Subtask"})
+	task, err := s.service.CreateTask(service.CreateTaskInput{AccountID: account.ID, ProjectID: projectID, Name: "New Task"})
 	if err != nil {
 		writeServiceError(w, err)
 		return
@@ -847,7 +776,7 @@ func (s *Server) handleCreateSubtask(
 	}
 
 	// Fetch parent category and render it as OOB
-	cat, err := s.service.GetCategory(service.GetCategoryInput{AccountID: account.ID, ID: sub.CategoryID, Viewer: service.OwnerViewer()})
+	cat, err := s.service.GetCategory(service.GetCategoryInput{AccountID: account.ID, ID: task.CategoryID, Viewer: service.OwnerViewer()})
 	if err != nil {
 		writeServiceError(w, err)
 		return
@@ -861,13 +790,13 @@ func (s *Server) handleCreateSubtask(
 	}
 	w.Write(buf.Bytes())
 
-	subtaskView := NewSubtaskView(sub, false, auth)
-	if err := s.renderer.RenderSlideoverWithDetails(w, subtaskView); err != nil {
+	taskView := NewTaskView(task, false, auth)
+	if err := s.renderer.RenderSlideoverWithDetails(w, taskView); err != nil {
 		writeServiceError(w, err)
 	}
 }
 
-func (s *Server) handleUpdateSubtask(
+func (s *App) handleUpdateTask(
 	w http.ResponseWriter,
 	r *http.Request,
 ) {
@@ -906,7 +835,7 @@ func (s *Server) handleUpdateSubtask(
 		update.Public = &public
 	}
 
-	sub, err := s.service.UpdateTask(update)
+	task, err := s.service.UpdateTask(update)
 	if err != nil {
 		writeServiceError(w, err)
 		return
@@ -918,7 +847,7 @@ func (s *Server) handleUpdateSubtask(
 	}
 
 	// Fetch parent category and render it as OOB
-	cat, err := s.service.GetCategory(service.GetCategoryInput{AccountID: account.ID, ID: sub.CategoryID, Viewer: service.OwnerViewer()})
+	cat, err := s.service.GetCategory(service.GetCategoryInput{AccountID: account.ID, ID: task.CategoryID, Viewer: service.OwnerViewer()})
 	if err != nil {
 		writeServiceError(w, err)
 		return
@@ -933,7 +862,7 @@ func (s *Server) handleUpdateSubtask(
 	w.Write(buf.Bytes())
 }
 
-func (s *Server) handleReorderCategories(
+func (s *App) handleReorderCategories(
 	w http.ResponseWriter,
 	r *http.Request,
 ) {
@@ -969,7 +898,7 @@ func (s *Server) handleReorderCategories(
 	w.WriteHeader(http.StatusOK)
 }
 
-func (s *Server) handleReorderTasks(
+func (s *App) handleReorderProjects(
 	w http.ResponseWriter,
 	r *http.Request,
 ) {
@@ -1006,7 +935,7 @@ func (s *Server) handleReorderTasks(
 	w.WriteHeader(http.StatusOK)
 }
 
-func (s *Server) handleReorderSubtasks(
+func (s *App) handleReorderTasks(
 	w http.ResponseWriter,
 	r *http.Request,
 ) {
@@ -1025,10 +954,10 @@ func (s *Server) handleReorderSubtasks(
 		return
 	}
 
-	taskID := r.FormValue("task_id")
+	projectID := r.FormValue("project_id")
 	ids := r.Form["id"]
 
-	if err := s.service.ReorderTasks(service.ReorderTasksInput{AccountID: account.ID, ProjectID: taskID, TaskIDs: ids}); err != nil {
+	if err := s.service.ReorderTasks(service.ReorderTasksInput{AccountID: account.ID, ProjectID: projectID, TaskIDs: ids}); err != nil {
 		writeServiceError(w, err)
 		return
 	}
@@ -1040,7 +969,7 @@ func (s *Server) handleReorderSubtasks(
 	w.WriteHeader(http.StatusOK)
 }
 
-func (s *Server) handleDeleteCategory(
+func (s *App) handleDeleteCategory(
 	w http.ResponseWriter,
 	r *http.Request,
 ) {
@@ -1071,7 +1000,7 @@ func (s *Server) handleDeleteCategory(
 	}
 }
 
-func (s *Server) handleDeleteTask(
+func (s *App) handleDeleteProject(
 	w http.ResponseWriter,
 	r *http.Request,
 ) {
@@ -1087,7 +1016,51 @@ func (s *Server) handleDeleteTask(
 	ctx := parseRequestContext(r)
 	id := r.PathValue("id")
 
-	task, err := s.service.DeleteProject(service.DeleteProjectInput{AccountID: account.ID, ID: id})
+	project, err := s.service.DeleteProject(service.DeleteProjectInput{AccountID: account.ID, ID: id})
+	if err != nil {
+		writeServiceError(w, err)
+		return
+	}
+
+	if !ctx.IsHTMX {
+		http.Redirect(w, r, auth.BasePath+"/", http.StatusSeeOther)
+		return
+	}
+
+	// Re-fetch category after deletion and render it as OOB
+	cat, err := s.service.GetCategory(service.GetCategoryInput{AccountID: account.ID, ID: project.CategoryID, Viewer: service.OwnerViewer()})
+	if err != nil {
+		writeServiceError(w, err)
+		return
+	}
+
+	s.renderer.RenderSlideoverClear(w)
+	catView := NewCategoryView(cat, true, auth)
+	var buf bytes.Buffer
+	if err := s.renderer.RenderCategoryOOB(&buf, catView); err != nil {
+		writeServiceError(w, err)
+		return
+	}
+	w.Write(buf.Bytes())
+}
+
+func (s *App) handleDeleteTask(
+	w http.ResponseWriter,
+	r *http.Request,
+) {
+	auth, ok := s.requireAuth(w, r)
+	if !ok {
+		return
+	}
+	account, auth, ok := s.resolveTenant(w, r, auth, true)
+	if !ok {
+		return
+	}
+
+	ctx := parseRequestContext(r)
+	id := r.PathValue("id")
+
+	task, err := s.service.DeleteTask(service.DeleteTaskInput{AccountID: account.ID, ID: id})
 	if err != nil {
 		writeServiceError(w, err)
 		return
@@ -1115,7 +1088,7 @@ func (s *Server) handleDeleteTask(
 	w.Write(buf.Bytes())
 }
 
-func (s *Server) handleDeleteSubtask(
+func (s *App) handleCreateProjectWorkLog(
 	w http.ResponseWriter,
 	r *http.Request,
 ) {
@@ -1129,9 +1102,46 @@ func (s *Server) handleDeleteSubtask(
 	}
 
 	ctx := parseRequestContext(r)
-	id := r.PathValue("id")
+	projectID := r.PathValue("id")
 
-	sub, err := s.service.DeleteTask(service.DeleteTaskInput{AccountID: account.ID, ID: id})
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Invalid form data", http.StatusBadRequest)
+		return
+	}
+
+	hoursWorked, err := strconv.ParseFloat(r.FormValue("hours_worked"), 64)
+	if err != nil {
+		http.Error(w, "Invalid hours_worked value", http.StatusBadRequest)
+		return
+	}
+
+	completionEstimate, err := strconv.Atoi(r.FormValue("completion_estimate"))
+	if err != nil {
+		http.Error(w, "Invalid completion_estimate value", http.StatusBadRequest)
+		return
+	}
+
+	workDescription := r.FormValue("work_description")
+
+	// Parse optional custom timestamp
+	var customTime *time.Time
+	if r.FormValue("use_custom_time") == "on" {
+		if ct := r.FormValue("custom_time"); ct != "" {
+			if parsed, err := time.ParseInLocation("2006-01-02T15:04", ct, time.Local); err == nil {
+				customTime = &parsed
+			}
+		}
+	}
+
+	workLogInput := service.AddProjectWorkLogInput{
+		AccountID:          account.ID,
+		ProjectID:          projectID,
+		HoursWorked:        hoursWorked,
+		WorkDescription:    workDescription,
+		CompletionEstimate: completionEstimate,
+		CreatedAt:          customTime,
+	}
+	workLog, err := s.service.AddProjectWorkLog(workLogInput)
 	if err != nil {
 		writeServiceError(w, err)
 		return
@@ -1142,24 +1152,39 @@ func (s *Server) handleDeleteSubtask(
 		return
 	}
 
-	// Re-fetch category after deletion and render it as OOB
-	cat, err := s.service.GetCategory(service.GetCategoryInput{AccountID: account.ID, ID: sub.CategoryID, Viewer: service.OwnerViewer()})
+	// Re-fetch category and render as OOB
+	cat, err := s.service.GetCategory(service.GetCategoryInput{AccountID: account.ID, ID: workLog.CategoryID, Viewer: service.OwnerViewer()})
 	if err != nil {
 		writeServiceError(w, err)
 		return
 	}
 
-	s.renderer.RenderSlideoverClear(w)
 	catView := NewCategoryView(cat, true, auth)
-	var buf bytes.Buffer
-	if err := s.renderer.RenderCategoryOOB(&buf, catView); err != nil {
+	if err := s.renderer.RenderCategoryOOB(w, catView); err != nil {
 		writeServiceError(w, err)
 		return
 	}
-	w.Write(buf.Bytes())
+
+	// Re-fetch project with work logs and render slideover OOB update
+	project, err := s.service.GetProject(service.GetProjectInput{AccountID: account.ID, ID: projectID, Viewer: service.OwnerViewer()})
+	if err != nil {
+		writeServiceError(w, err)
+		return
+	}
+	projectWorkLogs, err := s.service.ListProjectWorkLogs(service.ListProjectWorkLogsInput{AccountID: account.ID, ProjectID: projectID})
+	if err != nil {
+		writeServiceError(w, err)
+		return
+	}
+	project.WorkLogs = projectWorkLogs
+
+	projectView := NewProjectView(project, false, auth)
+	if err := s.renderer.RenderSlideoverWithDetails(w, projectView); err != nil {
+		writeServiceError(w, err)
+	}
 }
 
-func (s *Server) handleCreateTaskWorkLog(
+func (s *App) handleCreateTaskWorkLog(
 	w http.ResponseWriter,
 	r *http.Request,
 ) {
@@ -1204,105 +1229,9 @@ func (s *Server) handleCreateTaskWorkLog(
 		}
 	}
 
-	workLogInput := service.AddProjectWorkLogInput{
-		AccountID:          account.ID,
-		ProjectID:          taskID,
-		HoursWorked:        hoursWorked,
-		WorkDescription:    workDescription,
-		CompletionEstimate: completionEstimate,
-		CreatedAt:          customTime,
-	}
-	workLog, err := s.service.AddProjectWorkLog(workLogInput)
-	if err != nil {
-		writeServiceError(w, err)
-		return
-	}
-
-	if !ctx.IsHTMX {
-		http.Redirect(w, r, auth.BasePath+"/", http.StatusSeeOther)
-		return
-	}
-
-	// Re-fetch category and render as OOB
-	cat, err := s.service.GetCategory(service.GetCategoryInput{AccountID: account.ID, ID: workLog.CategoryID, Viewer: service.OwnerViewer()})
-	if err != nil {
-		writeServiceError(w, err)
-		return
-	}
-
-	catView := NewCategoryView(cat, true, auth)
-	if err := s.renderer.RenderCategoryOOB(w, catView); err != nil {
-		writeServiceError(w, err)
-		return
-	}
-
-	// Re-fetch task with work logs and render slideover OOB update
-	task, err := s.service.GetProject(service.GetProjectInput{AccountID: account.ID, ID: taskID, Viewer: service.OwnerViewer()})
-	if err != nil {
-		writeServiceError(w, err)
-		return
-	}
-	taskWorkLogs, err := s.service.ListProjectWorkLogs(service.ListProjectWorkLogsInput{AccountID: account.ID, ProjectID: taskID})
-	if err != nil {
-		writeServiceError(w, err)
-		return
-	}
-	task.WorkLogs = taskWorkLogs
-
-	taskView := NewTaskView(task, false, auth)
-	if err := s.renderer.RenderSlideoverWithDetails(w, taskView); err != nil {
-		writeServiceError(w, err)
-	}
-}
-
-func (s *Server) handleCreateSubtaskWorkLog(
-	w http.ResponseWriter,
-	r *http.Request,
-) {
-	auth, ok := s.requireAuth(w, r)
-	if !ok {
-		return
-	}
-	account, auth, ok := s.resolveTenant(w, r, auth, true)
-	if !ok {
-		return
-	}
-
-	ctx := parseRequestContext(r)
-	subtaskID := r.PathValue("id")
-
-	if err := r.ParseForm(); err != nil {
-		http.Error(w, "Invalid form data", http.StatusBadRequest)
-		return
-	}
-
-	hoursWorked, err := strconv.ParseFloat(r.FormValue("hours_worked"), 64)
-	if err != nil {
-		http.Error(w, "Invalid hours_worked value", http.StatusBadRequest)
-		return
-	}
-
-	completionEstimate, err := strconv.Atoi(r.FormValue("completion_estimate"))
-	if err != nil {
-		http.Error(w, "Invalid completion_estimate value", http.StatusBadRequest)
-		return
-	}
-
-	workDescription := r.FormValue("work_description")
-
-	// Parse optional custom timestamp
-	var customTime *time.Time
-	if r.FormValue("use_custom_time") == "on" {
-		if ct := r.FormValue("custom_time"); ct != "" {
-			if parsed, err := time.ParseInLocation("2006-01-02T15:04", ct, time.Local); err == nil {
-				customTime = &parsed
-			}
-		}
-	}
-
 	workLogInput := service.AddTaskWorkLogInput{
 		AccountID:          account.ID,
-		TaskID:             subtaskID,
+		TaskID:             taskID,
 		HoursWorked:        hoursWorked,
 		WorkDescription:    workDescription,
 		CompletionEstimate: completionEstimate,
@@ -1332,21 +1261,21 @@ func (s *Server) handleCreateSubtaskWorkLog(
 		return
 	}
 
-	// Re-fetch subtask with work logs and render slideover OOB update
-	sub, err := s.service.GetTask(service.GetTaskInput{AccountID: account.ID, ID: subtaskID, Viewer: service.OwnerViewer()})
+	// Re-fetch task with work logs and render slideover OOB update
+	task, err := s.service.GetTask(service.GetTaskInput{AccountID: account.ID, ID: taskID, Viewer: service.OwnerViewer()})
 	if err != nil {
 		writeServiceError(w, err)
 		return
 	}
-	subWorkLogs, err := s.service.ListTaskWorkLogs(service.ListTaskWorkLogsInput{AccountID: account.ID, TaskID: subtaskID})
+	taskWorkLogs, err := s.service.ListTaskWorkLogs(service.ListTaskWorkLogsInput{AccountID: account.ID, TaskID: taskID})
 	if err != nil {
 		writeServiceError(w, err)
 		return
 	}
-	sub.WorkLogs = subWorkLogs
+	task.WorkLogs = taskWorkLogs
 
-	subtaskView := NewSubtaskView(sub, false, auth)
-	if err := s.renderer.RenderSlideoverWithDetails(w, subtaskView); err != nil {
+	taskView := NewTaskView(task, false, auth)
+	if err := s.renderer.RenderSlideoverWithDetails(w, taskView); err != nil {
 		writeServiceError(w, err)
 	}
 }

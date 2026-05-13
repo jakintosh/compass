@@ -13,8 +13,8 @@ FROM alpine:3.22
 WORKDIR /app
 
 COPY --from=build /out/compass /app/compass
-COPY internal/web/templates /app/internal/web/templates
-COPY internal/web/static /app/internal/web/static
+COPY internal/app/templates /app/internal/app/templates
+COPY internal/app/static /app/internal/app/static
 
 EXPOSE 8080
 ENTRYPOINT ["/app/compass"]

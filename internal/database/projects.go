@@ -26,7 +26,7 @@ func (db *DB) GetProject(
 			t.completion,
 			t.public,
 			c.public AS parent_public
-		FROM tasks t
+		FROM projects t
 		JOIN categories c ON t.category_id = c.id
 		WHERE t.account_id = ?1 AND t.id = ?2`,
 		accountID,
@@ -64,7 +64,7 @@ func (db *DB) AddProject(
 	var maxOrder sql.NullInt64
 	db.Conn.QueryRow(`
 		SELECT MAX(sort_order)
-		FROM tasks
+		FROM projects
 		WHERE account_id = ?1 AND category_id = ?2`,
 		accountID,
 		catID,
@@ -73,7 +73,7 @@ func (db *DB) AddProject(
 
 	var project service.Project
 	if err := db.Conn.QueryRow(`
-		INSERT INTO tasks (id, account_id, category_id, name, sort_order)
+		INSERT INTO projects (id, account_id, category_id, name, sort_order)
 		SELECT ?1, ?2, id, ?4, ?5
 		FROM categories
 		WHERE account_id = ?2 AND id = ?3
@@ -113,7 +113,7 @@ func (db *DB) UpdateProject(
 ) {
 	var updated service.Project
 	if err := db.Conn.QueryRow(`
-		UPDATE tasks
+		UPDATE projects
 		SET name = ?1,
 			description = ?2,
 			completion = ?3,
@@ -155,7 +155,7 @@ func (db *DB) DeleteProject(
 ) {
 	var removed service.Project
 	if err := db.Conn.QueryRow(`
-		DELETE FROM tasks
+		DELETE FROM projects
 		WHERE account_id = ?1 AND id = ?2
 		RETURNING
 			id,
@@ -173,7 +173,7 @@ func (db *DB) DeleteProject(
 		&removed.Completion,
 	); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, fmt.Errorf("task not found")
+			return nil, fmt.Errorf("project not found")
 		}
 		return nil, err
 	}
@@ -183,7 +183,7 @@ func (db *DB) DeleteProject(
 func (db *DB) ReorderProjects(
 	accountID string,
 	catID string,
-	taskIDs []string,
+	projectIDs []string,
 ) error {
 	tx, err := db.Conn.Begin()
 	if err != nil {
@@ -191,9 +191,9 @@ func (db *DB) ReorderProjects(
 	}
 	defer tx.Rollback()
 
-	for i, id := range taskIDs {
+	for i, id := range projectIDs {
 		if _, err := tx.Exec(`
-			UPDATE tasks
+			UPDATE projects
 			SET sort_order = ?1
 			WHERE account_id = ?2 AND id = ?3 AND category_id = ?4`,
 			i,

@@ -30,7 +30,7 @@ func (db *DB) GetCategories(
 		return nil, err
 	}
 
-	subsByTask, err := db.sqlListTasksByProjectTx(tx, accountID)
+	tasksByProject, err := db.sqlListTasksByProjectTx(tx, accountID)
 	if err != nil {
 		return nil, err
 	}
@@ -39,7 +39,7 @@ func (db *DB) GetCategories(
 		return nil, fmt.Errorf("commit get categories tx: %w", err)
 	}
 
-	attachTasksToProjects(allProjects, subsByTask)
+	attachTasksToProjects(allProjects, tasksByProject)
 	attachProjectsToCategories(categories, projectsByCat)
 
 	return categories, nil
@@ -258,7 +258,7 @@ func (db *DB) sqlListProjectsByCategoryTx(
 			t.completion,
 			t.public,
 			c.public AS parent_public
-		FROM tasks t
+		FROM projects t
 		JOIN categories c ON t.category_id = c.id
 		WHERE t.account_id = ?1
 		ORDER BY t.sort_order ASC`,
@@ -298,15 +298,15 @@ func (db *DB) sqlListTasksByProjectTx(
 	rows, err := tx.Query(`
 		SELECT
 			s.id,
-			s.task_id,
+			s.project_id,
 			s.category_id,
 			s.name,
 			s.description,
 			s.completion,
 			s.public,
 			(c.public AND t.public) AS parent_public
-		FROM subtasks s
-		JOIN tasks t ON s.task_id = t.id
+		FROM tasks s
+		JOIN projects t ON s.project_id = t.id
 		JOIN categories c ON s.category_id = c.id
 		WHERE s.account_id = ?1
 		ORDER BY s.sort_order ASC`,
@@ -317,19 +317,19 @@ func (db *DB) sqlListTasksByProjectTx(
 	}
 	defer rows.Close()
 
-	subsByTask := make(map[string][]*service.Task)
+	tasksByProject := make(map[string][]*service.Task)
 	for rows.Next() {
 		task, err := scanTaskRows(rows)
 		if err != nil {
 			return nil, err
 		}
-		subsByTask[task.ProjectID] = append(subsByTask[task.ProjectID], task)
+		tasksByProject[task.ProjectID] = append(tasksByProject[task.ProjectID], task)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("iterate task rows: %w", err)
 	}
 
-	return subsByTask, nil
+	return tasksByProject, nil
 }
 
 func (db *DB) getProjectsForCategory(
@@ -348,7 +348,7 @@ func (db *DB) getProjectsForCategory(
 			t.completion,
 			t.public,
 			c.public AS parent_public
-		FROM tasks t
+		FROM projects t
 		JOIN categories c ON t.category_id = c.id
 		WHERE t.account_id = ?1 AND t.category_id = ?2
 		ORDER BY t.sort_order ASC`,
@@ -393,17 +393,17 @@ func (db *DB) getTasksForProject(
 	rows, err := db.Conn.Query(`
 		SELECT
 			s.id,
-			s.task_id,
+			s.project_id,
 			s.category_id,
 			s.name,
 			s.description,
 			s.completion,
 			s.public,
 			(c.public AND t.public) AS parent_public
-		FROM subtasks s
-		JOIN tasks t ON s.task_id = t.id
+		FROM tasks s
+		JOIN projects t ON s.project_id = t.id
 		JOIN categories c ON s.category_id = c.id
-		WHERE s.account_id = ?1 AND s.task_id = ?2
+		WHERE s.account_id = ?1 AND s.project_id = ?2
 		ORDER BY s.sort_order ASC`,
 		accountID,
 		projectID,
@@ -448,10 +448,10 @@ func scanCategory(
 
 func attachTasksToProjects(
 	projects []*service.Project,
-	subsByTask map[string][]*service.Task,
+	tasksByProject map[string][]*service.Task,
 ) {
 	for _, project := range projects {
-		if tasks, ok := subsByTask[project.ID]; ok {
+		if tasks, ok := tasksByProject[project.ID]; ok {
 			project.Tasks = tasks
 		}
 	}

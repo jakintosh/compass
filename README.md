@@ -1,24 +1,24 @@
 # Compass
 
-A minimal, single-page todo application that uses sliders instead of checkboxes. Each task represents progress on a continuum from 0% to 100%, rather than a binary done/not-done state.
+A minimal, single-page planning application that uses sliders instead of checkboxes. Each project or task represents progress on a continuum from 0% to 100%, rather than a binary done/not-done state.
 
 ## Key Features
 
-### Tasks as Progress
-Every task is a slider ranging from 0% to 100%. This lets you track gradual progress rather than just marking things complete.
+### Progress as a Continuum
+Every project and task is a slider ranging from 0% to 100%. This lets you track gradual progress rather than just marking things complete.
 
 ### Hierarchical Organization
-- **Categories**: Group related tasks together
-- **Tasks**: Individual items you're working on
-- **Subtasks**: Break down complex tasks into smaller pieces
+- **Categories**: Group related projects together
+- **Projects**: Larger efforts or outcomes you're working toward
+- **Tasks**: Concrete pieces of work inside a project
 
-When a task has subtasks, it no longer has its own slider. Instead, its completion percentage is automatically calculated as the average of all its subtasks.
+Projects can contain tasks, and both levels can carry their own progress and work log history.
 
 ### Flexible Management
-- **Reorder anything**: Drag and drop categories, tasks, and subtasks to organize them however you like
-- **Move tasks between categories**: Tasks can be dragged from one category to another
-- **Collapse categories**: Hide tasks you're not currently focused on
-- **Task details**: Click any task to view and edit its name and description
+- **Reorder anything**: Drag and drop categories, projects, and tasks to organize them however you like
+- **Move projects between categories**: Projects can be dragged from one category to another
+- **Collapse categories and projects**: Hide work you're not currently focused on
+- **Project and task details**: Click any project or task to view and edit its name and description
 
 ## Running the Application
 
@@ -55,12 +55,12 @@ Compass can cache each user's handle for tenant URLs like
 ## Usage
 
 1. **Create a category** using the "New Category +" button in the header
-2. **Add tasks** using the "Add a task" link within any category
-3. **Adjust progress** by dragging the slider for each task
-4. **View details** by clicking on any task name
-5. **Add subtasks** from the task details view
+2. **Add projects** using the "Add a project" link within any category
+3. **Add tasks** using the "Add a task" link within any project
+4. **Adjust progress** by dragging the slider for each project or task
+5. **View details** by clicking on any project or task name
 6. **Reorder** by dragging items using their handle (visible on hover)
 
 ## Philosophy
 
-This app makes no assumptions about what completion means for your tasks. The slider is deliberately abstract—100% simply means "done" in whatever way makes sense to you. Everything in between is yours to define.
+This app makes no assumptions about what completion means for your projects or tasks. The slider is deliberately abstract—100% simply means "done" in whatever way makes sense to you. Everything in between is yours to define.

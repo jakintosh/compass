@@ -45,22 +45,22 @@ document.addEventListener("htmx:load", function (evt) {
     categoriesList.sortableInitialized = true;
   }
 
-  // Initialize Sortable for Tasks within Categories
-  document.querySelectorAll(".tasks-list").forEach(function (el) {
+  // Initialize Sortable for Projects within Categories
+  document.querySelectorAll(".projects-list").forEach(function (el) {
     if (!el.sortableInitialized) {
       new Sortable(el, {
         animation: 150,
-        draggable: ".task-item",
+        draggable: ".project-item",
         handle: ".drag-handle",
         ghostClass: "ghost",
         onEnd: function () {
           let catId = el.getAttribute("data-category-id");
           let ids = [];
-          el.querySelectorAll(".task-item[data-id]").forEach(function (item) {
+          el.querySelectorAll(".project-item[data-id]").forEach(function (item) {
             ids.push(item.getAttribute("data-id"));
           });
 
-          htmx.ajax("POST", appURL("/tasks/reorder"), {
+          htmx.ajax("POST", appURL("/projects/reorder"), {
             values: withCsrf({
               category_id: catId,
               id: ids,
@@ -73,25 +73,25 @@ document.addEventListener("htmx:load", function (evt) {
     }
   });
 
-  // Initialize Sortable for Subtasks
-  document.querySelectorAll(".subtasks-list").forEach(function (el) {
+  // Initialize Sortable for Tasks
+  document.querySelectorAll(".tasks-list").forEach(function (el) {
     if (!el.sortableInitialized) {
       new Sortable(el, {
-        group: "subtasks-" + el.id,
+        group: "tasks-" + el.id,
         animation: 150,
-        draggable: ".subtask",
+        draggable: ".task",
         handle: ".drag-handle",
         ghostClass: "ghost",
         onEnd: function (evt) {
-          let taskId = el.id.replace("subtasks-list-", "");
+          let projectId = el.id.replace("tasks-list-", "");
           let ids = [];
           el.querySelectorAll("[data-id]").forEach(function (item) {
             ids.push(item.getAttribute("data-id"));
           });
 
-          htmx.ajax("POST", appURL("/subtasks/reorder"), {
+          htmx.ajax("POST", appURL("/tasks/reorder"), {
             values: withCsrf({
-              task_id: taskId,
+              project_id: projectId,
               id: ids,
             }),
             swap: "none",

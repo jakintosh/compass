@@ -1,7 +1,7 @@
-{{define "subtask_details"}}
+{{define "project_details"}}
 <div class="slideover">
     <div class="slideover-header">
-        <h2 class="slideover-title">Subtask Details</h2>
+        <h2 class="slideover-title">Project Details</h2>
         <button class="btn slideover-close" onclick="document.getElementById('slideover-container').innerHTML = ''">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
                 stroke-linecap="round" stroke-linejoin="round">
@@ -13,15 +13,15 @@
 
     <div class="slideover-body">
         {{if .CanWrite}}
-        <form class="form-field" hx-patch="{{.BasePath}}/subtasks/{{.ID}}?csrf={{.CSRFToken}}" hx-trigger="change" hx-swap="none">
+        <form class="form-field" hx-patch="{{.BasePath}}/projects/{{.ID}}?csrf={{.CSRFToken}}" hx-trigger="change" hx-swap="none">
             <label class="field-label">Name</label>
             <input type="text" value="{{.Name}}" class="field-input" name="name" _="on keydown[key is 'Enter'] blur() me">
         </form>
-        <form class="form-field" hx-patch="{{.BasePath}}/subtasks/{{.ID}}?csrf={{.CSRFToken}}" hx-trigger="change" hx-swap="none">
+        <form class="form-field" hx-patch="{{.BasePath}}/projects/{{.ID}}?csrf={{.CSRFToken}}" hx-trigger="change" hx-swap="none">
             <label class="field-label">Description</label>
             <textarea rows="3" class="field-textarea" placeholder="Add a description..." name="description">{{.Description}}</textarea>
         </form>
-        <form class="form-field" hx-patch="{{.BasePath}}/subtasks/{{.ID}}?csrf={{.CSRFToken}}" hx-trigger="change" hx-swap="none">
+        <form class="form-field" hx-patch="{{.BasePath}}/projects/{{.ID}}?csrf={{.CSRFToken}}" hx-trigger="change" hx-swap="none">
             <label class="toggle-switch-label">
                 <span class="toggle-switch-text">Public{{if not .ParentPublic}} (parent is private){{end}}</span>
                 <input type="checkbox" name="public" class="toggle-switch-input"
@@ -34,7 +34,7 @@
         <div class="work-log-section">
             <h3 class="section-title">Work Log</h3>
 
-            <form class="work-log-form" hx-post="{{.BasePath}}/subtasks/{{.ID}}/work-logs?csrf={{.CSRFToken}}" hx-swap="none" _="
+            <form class="work-log-form" hx-post="{{.BasePath}}/projects/{{.ID}}/work-logs?csrf={{.CSRFToken}}" hx-swap="none" _="
                     on htmx:afterRequest
                         reset() me
                         remove .open from .form-expandable in me

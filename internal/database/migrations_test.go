@@ -20,8 +20,8 @@ func TestMigrations_CreateRequiredTables(t *testing.T) {
 	for _, table := range []string{
 		"accounts",
 		"categories",
+		"projects",
 		"tasks",
-		"subtasks",
 		"work_logs",
 	} {
 		var count int
@@ -44,12 +44,12 @@ func TestMigrations_CreateRequiredIndexes(t *testing.T) {
 
 	for _, index := range []string{
 		"idx_categories_account",
+		"idx_projects_account",
 		"idx_tasks_account",
-		"idx_subtasks_account",
 		"idx_work_logs_account",
 		"idx_work_logs_category",
+		"idx_work_logs_project",
 		"idx_work_logs_task",
-		"idx_work_logs_subtask",
 		"idx_work_logs_created_at",
 	} {
 		var count int

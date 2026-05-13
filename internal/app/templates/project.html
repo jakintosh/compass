@@ -1,20 +1,20 @@
-{{define "task_name"}}
-<h3 id="task-name-{{.ID}}" class="item-name" {{if .OOB}}hx-swap-oob="true"{{end}}>{{.Name}}</h3>
+{{define "project_name"}}
+<h3 id="project-name-{{.ID}}" class="item-name" {{if .OOB}}hx-swap-oob="true"{{end}}>{{.Name}}</h3>
 {{end}}
 
-{{define "task_private_icon"}}
+{{define "project_private_icon"}}
 {{if or (not .Public) (not .ParentPublic)}}<span class="private-indicator"><svg class="private-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" title="Private"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg></span>{{end}}
 {{end}}
 
-{{define "task_percent"}}
-<span id="task-percent-{{.ID}}" class="item-percent" {{if .OOB}}hx-swap-oob="true"{{end}}>{{.Completion}}%</span>
+{{define "project_percent"}}
+<span id="project-percent-{{.ID}}" class="item-percent" {{if .OOB}}hx-swap-oob="true"{{end}}>{{.Completion}}%</span>
 {{end}}
 
-{{define "task_progress_fill"}}
-<div id="task-progress-fill-{{.ID}}" class="progress-fill" style="width: {{.Completion}}%" {{if .OOB}}hx-swap-oob="true"{{end}}></div>
+{{define "project_progress_fill"}}
+<div id="project-progress-fill-{{.ID}}" class="progress-fill" style="width: {{.Completion}}%" {{if .OOB}}hx-swap-oob="true"{{end}}></div>
 {{end}}
 
-<li class="task-item" id="task-{{.ID}}" data-id="{{.ID}}" data-ui-key="ui.task.{{.ID}}.collapsed" data-ui-class="collapsed" {{if .OOB}}hx-swap-oob="true"{{end}}>
+<li class="project-item" id="project-{{.ID}}" data-id="{{.ID}}" data-ui-key="ui.project.{{.ID}}.collapsed" data-ui-class="collapsed" {{if .OOB}}hx-swap-oob="true"{{end}}>
     <div class="row">
         {{if .CanWrite}}
         <!-- Drag handle -->
@@ -41,13 +41,13 @@
             </svg>
         </button>
 
-        <div class="row-content" hx-get="{{.BasePath}}/tasks/{{.ID}}/details" hx-target="#slideover-container" hx-swap="innerHTML">
-            {{template "task_name" .}}
-            {{template "task_private_icon" .}}
-            {{if .HasSubtasks}}<span class="subtask-indicator">{{len .Subtasks}}</span>{{end}}
+        <div class="row-content" hx-get="{{.BasePath}}/projects/{{.ID}}/details" hx-target="#slideover-container" hx-swap="innerHTML">
+            {{template "project_name" .}}
+            {{template "project_private_icon" .}}
+            {{if .HasTasks}}<span class="task-indicator">{{len .Tasks}}</span>{{end}}
             <span class="item-spacer"></span>
-            <div class="progress-bar">{{template "task_progress_fill" .}}</div>
-            {{template "task_percent" .}}
+            <div class="progress-bar">{{template "project_progress_fill" .}}</div>
+            {{template "project_percent" .}}
             <svg class="row-content-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <line x1="5" y1="12" x2="19" y2="12"></line>
                 <polyline points="12 5 19 12 12 19"></polyline>
@@ -55,14 +55,14 @@
         </div>
     </div>
 
-    <!-- Subtasks section -->
-    <ul id="subtasks-list-{{.ID}}" class="subtasks-list">
-        {{range .Subtasks}} {{template "subtask.html" .}} {{end}}
+    <!-- Tasks section -->
+    <ul id="tasks-list-{{.ID}}" class="tasks-list">
+        {{range .Tasks}} {{template "task.html" .}} {{end}}
         {{if .CanWrite}}
         <li class="row add-item">
-            <button class="btn btn-add" hx-post="{{.BasePath}}/tasks/{{.ID}}/subtasks?csrf={{.CSRFToken}}" hx-target="closest li" hx-swap="beforebegin">
+            <button class="btn btn-add" hx-post="{{.BasePath}}/projects/{{.ID}}/tasks?csrf={{.CSRFToken}}" hx-target="closest li" hx-swap="beforebegin">
                 <span class="arrow">→</span>
-                <span>Add a subtask</span>
+                <span>Add a task</span>
             </button>
         </li>
         {{end}}

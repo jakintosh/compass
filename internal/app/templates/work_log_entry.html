@@ -2,8 +2,8 @@
 <div class="work-log-entry">
     <div class="work-log-header">
         <span class="work-log-date">{{.CreatedAt}}</span>
+        {{if .ProjectName}}<span class="badge badge-project">{{.ProjectName}}</span>{{end}}
         {{if .TaskName}}<span class="badge badge-task">{{.TaskName}}</span>{{end}}
-        {{if .SubtaskName}}<span class="badge badge-subtask">{{.SubtaskName}}</span>{{end}}
     </div>
     <div class="work-log-stats">
         <span class="work-log-hours">{{.HoursWorked}}h</span>

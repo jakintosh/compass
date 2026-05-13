@@ -1,4 +1,4 @@
-package web
+package app
 
 import (
 	"bytes"
@@ -54,12 +54,12 @@ func (p *Renderer) RenderIndexWithDetails(
 		var buf bytes.Buffer
 
 		switch v := detailsView.(type) {
-		case TaskView:
-			if err := p.tmpl.ExecuteTemplate(&buf, "details", v); err != nil {
+		case ProjectView:
+			if err := p.tmpl.ExecuteTemplate(&buf, "project_details", v); err != nil {
 				return err
 			}
-		case SubtaskView:
-			if err := p.tmpl.ExecuteTemplate(&buf, "subtask_details", v); err != nil {
+		case TaskView:
+			if err := p.tmpl.ExecuteTemplate(&buf, "task_details", v); err != nil {
 				return err
 			}
 		case CategoryView:
@@ -97,12 +97,12 @@ func (p *Renderer) RenderSlideoverWithDetails(
 		if err := p.tmpl.ExecuteTemplate(&buf, "category_details", v); err != nil {
 			return err
 		}
-	case TaskView:
-		if err := p.tmpl.ExecuteTemplate(&buf, "details", v); err != nil {
+	case ProjectView:
+		if err := p.tmpl.ExecuteTemplate(&buf, "project_details", v); err != nil {
 			return err
 		}
-	case SubtaskView:
-		if err := p.tmpl.ExecuteTemplate(&buf, "subtask_details", v); err != nil {
+	case TaskView:
+		if err := p.tmpl.ExecuteTemplate(&buf, "task_details", v); err != nil {
 			return err
 		}
 	default:

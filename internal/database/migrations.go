@@ -32,7 +32,7 @@ var migrations = []Migration{
 				FOREIGN KEY(account_id) REFERENCES accounts(id) ON DELETE CASCADE
 			);
 
-			CREATE TABLE tasks (
+			CREATE TABLE projects (
 				id TEXT PRIMARY KEY,
 				account_id TEXT NOT NULL,
 				category_id TEXT NOT NULL,
@@ -45,10 +45,10 @@ var migrations = []Migration{
 				FOREIGN KEY(category_id) REFERENCES categories(id) ON DELETE CASCADE
 			);
 
-			CREATE TABLE subtasks (
+			CREATE TABLE tasks (
 				id TEXT PRIMARY KEY,
 				account_id TEXT NOT NULL,
-				task_id TEXT NOT NULL,
+				project_id TEXT NOT NULL,
 				category_id TEXT NOT NULL,
 				name TEXT NOT NULL,
 				description TEXT NOT NULL DEFAULT '',
@@ -56,7 +56,7 @@ var migrations = []Migration{
 				public INTEGER NOT NULL DEFAULT 1,
 				sort_order INTEGER NOT NULL DEFAULT 0,
 				FOREIGN KEY(account_id) REFERENCES accounts(id) ON DELETE CASCADE,
-				FOREIGN KEY(task_id) REFERENCES tasks(id) ON DELETE CASCADE,
+				FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE,
 				FOREIGN KEY(category_id) REFERENCES categories(id) ON DELETE CASCADE
 			);
 
@@ -64,25 +64,25 @@ var migrations = []Migration{
 				id TEXT PRIMARY KEY,
 				account_id TEXT NOT NULL,
 				category_id TEXT NOT NULL,
-				task_id TEXT NOT NULL,
-				subtask_id TEXT,
+				project_id TEXT NOT NULL,
+				task_id TEXT,
 				hours_worked REAL NOT NULL,
 				work_description TEXT NOT NULL,
 				completion_estimate INTEGER NOT NULL,
 				created_at INTEGER NOT NULL,
 				FOREIGN KEY(account_id) REFERENCES accounts(id) ON DELETE CASCADE,
 				FOREIGN KEY(category_id) REFERENCES categories(id) ON DELETE CASCADE,
-				FOREIGN KEY(task_id) REFERENCES tasks(id) ON DELETE CASCADE,
-				FOREIGN KEY(subtask_id) REFERENCES subtasks(id) ON DELETE CASCADE
+				FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE,
+				FOREIGN KEY(task_id) REFERENCES tasks(id) ON DELETE CASCADE
 			);
 
 			CREATE INDEX idx_categories_account ON categories(account_id);
+			CREATE INDEX idx_projects_account ON projects(account_id);
 			CREATE INDEX idx_tasks_account ON tasks(account_id);
-			CREATE INDEX idx_subtasks_account ON subtasks(account_id);
 			CREATE INDEX idx_work_logs_account ON work_logs(account_id);
 			CREATE INDEX idx_work_logs_category ON work_logs(category_id);
+			CREATE INDEX idx_work_logs_project ON work_logs(project_id);
 			CREATE INDEX idx_work_logs_task ON work_logs(task_id);
-			CREATE INDEX idx_work_logs_subtask ON work_logs(subtask_id);
 			CREATE INDEX idx_work_logs_created_at ON work_logs(created_at DESC);
 		`,
 	},

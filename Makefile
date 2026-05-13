@@ -2,14 +2,15 @@ GO := go
 APP := compass
 BIN_DIR := ./bin
 BIN := $(BIN_DIR)/$(APP)
+DATA_DIR := ./data
 
 ADDR ?= :8080
-DB_PATH ?= compass.db
-DEV_KEY_PATH ?= dev.key
+DB_PATH ?= $(DATA_DIR)/compass.db
+DEV_KEY_PATH ?= $(DATA_DIR)/dev.key
 
 .DEFAULT_GOAL := help
 
-.PHONY: help build generate test fmt vet lint install run clean reset
+.PHONY: help build generate test fmt vet lint install init run clean reset
 
 help:
 	printf "Targets:\n"
@@ -20,6 +21,7 @@ help:
 	printf "  vet      Run Go static analysis\n"
 	printf "  lint     Run formatting and static checks\n"
 	printf "  install  Install the CLI binary\n"
+	printf "  init     Create local runtime directories\n"
 	printf "  run      Run the local service in dev auth mode\n"
 	printf "  clean    Remove build and test artifacts\n"
 	printf "  reset    Remove local runtime state\n"
@@ -45,11 +47,14 @@ lint: fmt vet
 install:
 	$(GO) install ./cmd/$(APP)
 
-run: build
+init:
+	mkdir -p $(DATA_DIR)
+
+run: build init
 	$(BIN) serve --dev --addr $(ADDR) --db-path $(DB_PATH) --dev-key-path $(DEV_KEY_PATH)
 
 clean:
 	rm -rf $(BIN_DIR)
 
 reset:
-	rm -f $(DB_PATH) $(DB_PATH)-shm $(DB_PATH)-wal $(DEV_KEY_PATH)
+	rm -rf $(DATA_DIR)

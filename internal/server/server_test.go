@@ -1,6 +1,11 @@
 package server
 
-import "testing"
+import (
+	"net/http"
+	"net/http/httptest"
+	"path/filepath"
+	"testing"
+)
 
 func TestBuildProductionAppConfig(t *testing.T) {
 	cfg, err := buildProductionAppConfig("https://compass.example.com")
@@ -44,5 +49,63 @@ func TestBuildAuthorizeURL(t *testing.T) {
 	want := "https://consent.example.com/authorize?integration=compass&scope=identity&scope=profile"
 	if got != want {
 		t.Fatalf("buildAuthorizeURL = %q, want %q", got, want)
+	}
+}
+
+func TestBuildHandlerMountsAuthAndAppRoutes(t *testing.T) {
+	dir := t.TempDir()
+	handler, cleanup, err := BuildHandler(Options{
+		Dev:        true,
+		DBPath:     filepath.Join(dir, "compass.db"),
+		DevKeyPath: filepath.Join(dir, "dev.key"),
+	})
+	if err != nil {
+		t.Fatalf("BuildHandler returned error: %v", err)
+	}
+	defer cleanup()
+
+	tests := []struct {
+		name   string
+		method string
+		path   string
+	}{
+		{
+			name:   "app index",
+			method: http.MethodGet,
+			path:   "/",
+		},
+		{
+			name:   "dev auth route",
+			method: http.MethodGet,
+			path:   "/dev/login",
+		},
+		{
+			name:   "tenant category route",
+			method: http.MethodPost,
+			path:   "/alice/categories",
+		},
+		{
+			name:   "tenant project route",
+			method: http.MethodPost,
+			path:   "/alice/projects/reorder",
+		},
+		{
+			name:   "tenant task route",
+			method: http.MethodPost,
+			path:   "/alice/tasks/reorder",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(tt.method, tt.path, nil)
+			rec := httptest.NewRecorder()
+
+			handler.ServeHTTP(rec, req)
+
+			if rec.Code == http.StatusNotFound {
+				t.Fatalf("%s returned 404", tt.path)
+			}
+		})
 	}
 }

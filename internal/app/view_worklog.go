@@ -1,4 +1,4 @@
-package web
+package app
 
 import (
 	"fmt"
@@ -13,15 +13,15 @@ type WorkLogView struct {
 	WorkDescription    string
 	CompletionEstimate int
 	CreatedAt          string // Formatted timestamp
-	TaskName           string // For category view context
-	SubtaskName        string // For task/category view context
+	ProjectName        string // For category view context
+	TaskName           string // For project/category view context
 }
 
 // NewWorkLogView creates a WorkLogView from a service WorkLog.
 func NewWorkLogView(
 	wl *service.WorkLog,
-	taskName,
-	subtaskName string,
+	projectName,
+	taskName string,
 ) WorkLogView {
 	return WorkLogView{
 		ID:                 wl.ID,
@@ -29,45 +29,45 @@ func NewWorkLogView(
 		WorkDescription:    wl.WorkDescription,
 		CompletionEstimate: wl.CompletionEstimate,
 		CreatedAt:          wl.CreatedAt.Format("Jan 2, 3:04 PM"),
+		ProjectName:        projectName,
 		TaskName:           taskName,
-		SubtaskName:        subtaskName,
 	}
 }
 
-func NewWorkLogViewsFromSubtask(
+func NewWorkLogViewsFromTask(
 	s *service.Task,
 ) []WorkLogView {
 	return newWorkLogViews(s.WorkLogs, nil, nil)
 }
 
-func NewWorkLogViewsFromTask(
+func NewWorkLogViewsFromProject(
 	t *service.Project,
 ) []WorkLogView {
-	subtaskNames := make(map[string]string, len(t.Tasks))
+	taskNames := make(map[string]string, len(t.Tasks))
 	for _, s := range t.Tasks {
-		subtaskNames[s.ID] = s.Name
+		taskNames[s.ID] = s.Name
 	}
-	return newWorkLogViews(t.WorkLogs, nil, subtaskNames)
+	return newWorkLogViews(t.WorkLogs, nil, taskNames)
 }
 
 func NewWorkLogViewsFromCategory(
 	c *service.Category,
 ) []WorkLogView {
-	taskNames := make(map[string]string, len(c.Projects))
-	subtaskNames := make(map[string]string)
+	projectNames := make(map[string]string, len(c.Projects))
+	taskNames := make(map[string]string)
 	for _, p := range c.Projects {
-		taskNames[p.ID] = p.Name
+		projectNames[p.ID] = p.Name
 		for _, s := range p.Tasks {
-			subtaskNames[s.ID] = s.Name
+			taskNames[s.ID] = s.Name
 		}
 	}
-	return newWorkLogViews(c.WorkLogs, taskNames, subtaskNames)
+	return newWorkLogViews(c.WorkLogs, projectNames, taskNames)
 }
 
 func newWorkLogViews(
 	workLogs []*service.WorkLog,
+	projectNames map[string]string,
 	taskNames map[string]string,
-	subtaskNames map[string]string,
 ) []WorkLogView {
 	if workLogs == nil {
 		return nil
@@ -75,7 +75,7 @@ func newWorkLogViews(
 
 	views := make([]WorkLogView, len(workLogs))
 	for i, wl := range workLogs {
-		views[i] = NewWorkLogView(wl, taskNames[wl.ProjectID], subtaskNames[wl.TaskID])
+		views[i] = NewWorkLogView(wl, projectNames[wl.ProjectID], taskNames[wl.TaskID])
 	}
 	return views
 }

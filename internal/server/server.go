@@ -14,11 +14,12 @@ import (
 	"strings"
 	"time"
 
+	"git.sr.ht/~jakintosh/command-go/pkg/wire"
+	"git.sr.ht/~jakintosh/compass/internal/app"
 	"git.sr.ht/~jakintosh/compass/internal/database"
 	"git.sr.ht/~jakintosh/compass/internal/service"
-	"git.sr.ht/~jakintosh/compass/internal/web"
 	"git.sr.ht/~jakintosh/consent/pkg/client"
-	contesting "git.sr.ht/~jakintosh/consent/pkg/testing"
+	"git.sr.ht/~jakintosh/consent/pkg/testing"
 	"git.sr.ht/~jakintosh/consent/pkg/tokens"
 )
 
@@ -38,6 +39,11 @@ type productionAppConfig struct {
 	callbackURL string
 	homepage    string
 	logoURL     string
+}
+
+type authConfig struct {
+	app.AuthConfig
+	Routes map[string]http.HandlerFunc
 }
 
 var consentScopes = []string{"identity", "profile"}
@@ -103,22 +109,29 @@ func BuildHandler(
 		return nil, nil, err
 	}
 
-	webOpts := web.ServerOptions{
-		Auth: authConfig,
+	appOpts := app.Options{
+		Service: svc,
+		Auth:    authConfig.AuthConfig,
 	}
-	srv, err := web.NewServer(svc, webOpts)
+	renderedApp, err := app.New(appOpts)
 	if err != nil {
 		cleanup()
-		return nil, nil, fmt.Errorf("failed to initialize server: %w", err)
+		return nil, nil, fmt.Errorf("failed to initialize app: %w", err)
 	}
 
-	return srv, cleanup, nil
+	root := http.NewServeMux()
+	for path, handler := range authConfig.Routes {
+		root.HandleFunc(path, handler)
+	}
+	wire.Subrouter(root, "/", renderedApp.Handler())
+
+	return root, cleanup, nil
 }
 
 func buildAuthConfig(
 	opts Options,
 ) (
-	web.AuthConfig,
+	authConfig,
 	error,
 ) {
 	if opts.Dev {
@@ -131,22 +144,24 @@ func buildAuthConfig(
 func buildDevAuthConfig(
 	opts Options,
 ) (
-	web.AuthConfig,
+	authConfig,
 	error,
 ) {
 	key, err := getOrGenerateDevKey(opts.DevKeyPath)
 	if err != nil {
-		return web.AuthConfig{}, fmt.Errorf("failed to get/generate dev key: %w", err)
+		return authConfig{}, fmt.Errorf("failed to get/generate dev key: %w", err)
 	}
 
-	env := contesting.NewTestEnvWithKey(key, "localhost", "compass-dev")
+	env := testing.NewTestEnvWithKey(key, "localhost", "compass-dev")
 	env.Scopes = consentScopes
-	tv := contesting.NewTestVerifierWithEnv(env)
+	tv := testing.NewTestVerifierWithEnv(env)
 
-	authConfig := web.AuthConfig{
-		Verifier:  tv,
-		LoginURL:  "/dev/login",
-		LogoutURL: "/dev/logout",
+	authConfig := authConfig{
+		AuthConfig: app.AuthConfig{
+			Verifier:  tv,
+			LoginURL:  "/dev/login",
+			LogoutURL: "/dev/logout",
+		},
 		Routes: map[string]http.HandlerFunc{
 			"/dev/login":  tv.HandleDevLogin(),
 			"/dev/logout": tv.HandleDevLogout(),
@@ -158,26 +173,28 @@ func buildDevAuthConfig(
 func buildProductionAuthConfig(
 	opts Options,
 ) (
-	web.AuthConfig,
+	authConfig,
 	error,
 ) {
-	if opts.ConsentURL == "" || opts.ConsentPubkey == "" || opts.PublicURL == "" {
-		return web.AuthConfig{}, fmt.Errorf("production mode requires --consent-url, --consent-pubkey, and --public-url")
+	if opts.ConsentURL == "" ||
+		opts.ConsentPubkey == "" ||
+		opts.PublicURL == "" {
+		return authConfig{}, fmt.Errorf("production mode requires --consent-url, --consent-pubkey, and --public-url")
 	}
 
 	pubKey, err := parsePublicKey(opts.ConsentPubkey)
 	if err != nil {
-		return web.AuthConfig{}, fmt.Errorf("failed to parse consent public key: %w", err)
+		return authConfig{}, fmt.Errorf("failed to parse consent public key: %w", err)
 	}
 
 	baseUrl, issuer, err := processConsentURL(opts.ConsentURL)
 	if err != nil {
-		return web.AuthConfig{}, fmt.Errorf("invalid consent URL: %w", err)
+		return authConfig{}, fmt.Errorf("invalid consent URL: %w", err)
 	}
 
 	appConfig, err := buildProductionAppConfig(opts.PublicURL)
 	if err != nil {
-		return web.AuthConfig{}, fmt.Errorf("invalid public URL: %w", err)
+		return authConfig{}, fmt.Errorf("invalid public URL: %w", err)
 	}
 
 	validatorOpts := tokens.ClientOptions{
@@ -199,11 +216,13 @@ func buildProductionAuthConfig(
 		ConsentBaseURL: baseUrl,
 	}
 
-	authConfig := web.AuthConfig{
-		Verifier:       authClient,
-		ProfileFetcher: authClient,
-		LoginURL:       buildAuthorizeURL(baseUrl, opts.IntegrationName),
-		LogoutURL:      "/auth/logout",
+	authConfig := authConfig{
+		AuthConfig: app.AuthConfig{
+			Verifier:       authClient,
+			ProfileFetcher: authClient,
+			LoginURL:       buildAuthorizeURL(baseUrl, opts.IntegrationName),
+			LogoutURL:      "/auth/logout",
+		},
 		Routes: map[string]http.HandlerFunc{
 			"/auth/callback":               authClient.HandleAuthorizationCode(),
 			"/auth/logout":                 authClient.HandleLogout(),

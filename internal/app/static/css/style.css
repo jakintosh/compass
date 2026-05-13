@@ -293,8 +293,8 @@ body {
     border-left: 1px solid var(--color-border);
 }
 
-.tasks-list,
-.subtasks-list {
+.projects-list,
+.tasks-list {
     list-style: none;
     margin: 0;
     padding: 0;
@@ -372,26 +372,26 @@ body {
     margin-top: var(--space-xs);
 }
 
-.category.collapsed>.tasks-list {
+.category.collapsed>.projects-list {
     display: none;
 }
 
 /* ==========================================
-   Task
+   Project
    ========================================== */
-.task-item {
+.project-item {
     list-style: none;
 }
 
-.task-item .subtask-indicator {
+.project-item .task-indicator {
     display: none;
 }
 
-.task-item.collapsed>.subtasks-list {
+.project-item.collapsed>.tasks-list {
     display: none;
 }
 
-.task-item.collapsed .subtask-indicator {
+.project-item.collapsed .task-indicator {
     display: inline;
 }
 
@@ -530,8 +530,8 @@ body {
 }
 
 .category-header.sortable-chosen,
-.task.sortable-chosen,
-.subtask.sortable-chosen {
+.project-item.sortable-chosen,
+.task.sortable-chosen {
     cursor: grabbing !important;
 }
 
@@ -571,7 +571,7 @@ body {
         color var(--transition-fast);
 }
 
-:is(.category, .task-item).collapsed .expand-toggle-icon {
+:is(.category, .project-item).collapsed .expand-toggle-icon {
     transform: rotate(-90deg);
 }
 
@@ -579,8 +579,8 @@ body {
     color: var(--color-text);
 }
 
-/* Subtask count indicator */
-.subtask-indicator {
+/* Task count indicator */
+.task-indicator {
     font-size: var(--font-size-xs);
     color: var(--color-text-muted);
     background: var(--color-surface);
@@ -1008,13 +1008,13 @@ body {
     white-space: nowrap;
 }
 
-.badge-task {
+.badge-project {
     background-color: var(--color-surface);
     border: 1px solid var(--color-border);
     color: var(--color-text-muted);
 }
 
-.badge-subtask {
+.badge-task {
     background-color: var(--color-accent-muted);
     color: var(--color-accent);
 }
