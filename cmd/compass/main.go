@@ -4,6 +4,7 @@ import (
 	"os"
 
 	"git.sr.ht/~jakintosh/command-go/pkg/args"
+	"git.sr.ht/~jakintosh/command-go/pkg/version"
 )
 
 func main() {
@@ -19,7 +20,15 @@ var rootCmd = &args.Command{
 			Long:  "help",
 		},
 	},
+	Options: []args.Option{
+		{
+			Long: "verbose",
+			Type: args.OptionTypeFlag,
+			Help: "show detailed output",
+		},
+	},
 	Subcommands: []*args.Command{
+		version.Command(VersionInfo),
 		serveCmd,
 	},
 }

@@ -2,3 +2,4 @@ bin/
 docs/
 *.db*
 dev.key
+version_generated.go
