@@ -24,5 +24,8 @@ func mapStoreError(
 	if strings.Contains(strings.ToLower(err.Error()), "not found") {
 		return ErrNotFound
 	}
+	if strings.Contains(strings.ToLower(err.Error()), "not active") {
+		return ErrInvalidInput
+	}
 	return err
 }

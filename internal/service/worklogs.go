@@ -14,6 +14,8 @@ type WorkLog struct {
 	WorkDescription    string    `json:"work_description"`
 	CompletionEstimate int       `json:"completion_estimate"`
 	CreatedAt          time.Time `json:"created_at"`
+	UpdatedAt          time.Time `json:"updated_at"`
+	DeletedAt          time.Time `json:"deleted_at"`
 }
 
 type AddProjectWorkLogInput struct {

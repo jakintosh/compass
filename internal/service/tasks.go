@@ -3,6 +3,7 @@ package service
 import (
 	"slices"
 	"strings"
+	"time"
 )
 
 type Task struct {
@@ -11,9 +12,14 @@ type Task struct {
 	CategoryID   string     `json:"category_id"`
 	Name         string     `json:"name"`
 	Description  string     `json:"description"`
+	Status       string     `json:"status"`
 	Completion   int        `json:"completion"`
 	Public       bool       `json:"public"`
 	ParentPublic bool       `json:"parent_public"`
+	CreatedAt    time.Time  `json:"created_at"`
+	UpdatedAt    time.Time  `json:"updated_at"`
+	ArchivedAt   *time.Time `json:"archived_at,omitempty"`
+	DeletedAt    *time.Time `json:"deleted_at,omitempty"`
 	WorkLogs     []*WorkLog `json:"work_logs,omitempty"`
 }
 
@@ -129,6 +135,7 @@ type UpdateTaskInput struct {
 	ID          string
 	Name        *string
 	Description *string
+	Status      *string
 	Completion  *int
 	Public      *bool
 }
@@ -155,6 +162,9 @@ func (in *UpdateTaskInput) Validate() error {
 		return ErrInvalidInput
 	}
 	if in.Completion != nil && !validCompletion(*in.Completion) {
+		return ErrInvalidInput
+	}
+	if in.Status != nil && !validStatus(*in.Status) {
 		return ErrInvalidInput
 	}
 	return nil
@@ -188,8 +198,127 @@ func (s *Service) UpdateTask(
 	if input.Public != nil {
 		task.Public = *input.Public
 	}
+	if input.Status != nil {
+		task.Status = *input.Status
+	}
 
 	task, err = s.store.UpdateTask(input.AccountID, task)
+	if err != nil {
+		return nil, mapStoreError(err)
+	}
+
+	return task, nil
+}
+
+type MoveTaskInput struct {
+	AccountID       string
+	ID              string
+	TargetProjectID string
+	TargetIndex     int
+}
+
+func (in *MoveTaskInput) Normalize() {
+	in.AccountID = strings.TrimSpace(in.AccountID)
+	in.ID = strings.TrimSpace(in.ID)
+	in.TargetProjectID = strings.TrimSpace(in.TargetProjectID)
+}
+
+func (in *MoveTaskInput) Validate() error {
+	if in.AccountID == "" ||
+		in.ID == "" ||
+		in.TargetProjectID == "" ||
+		in.TargetIndex < 0 {
+		return ErrInvalidInput
+	}
+	return nil
+}
+
+func (s *Service) MoveTask(
+	input MoveTaskInput,
+) (
+	*Task,
+	error,
+) {
+	input.Normalize()
+	if err := input.Validate(); err != nil {
+		return nil, err
+	}
+
+	task, err := s.store.MoveTask(input.AccountID, input.ID, input.TargetProjectID, input.TargetIndex)
+	if err != nil {
+		return nil, mapStoreError(err)
+	}
+
+	return task, nil
+}
+
+type ArchiveTaskInput struct {
+	AccountID string
+	ID        string
+}
+
+func (in *ArchiveTaskInput) Normalize() {
+	in.AccountID = strings.TrimSpace(in.AccountID)
+	in.ID = strings.TrimSpace(in.ID)
+}
+
+func (in *ArchiveTaskInput) Validate() error {
+	if in.AccountID == "" ||
+		in.ID == "" {
+		return ErrInvalidInput
+	}
+	return nil
+}
+
+func (s *Service) ArchiveTask(
+	input ArchiveTaskInput,
+) (
+	*Task,
+	error,
+) {
+	input.Normalize()
+	if err := input.Validate(); err != nil {
+		return nil, err
+	}
+
+	task, err := s.store.ArchiveTask(input.AccountID, input.ID)
+	if err != nil {
+		return nil, mapStoreError(err)
+	}
+
+	return task, nil
+}
+
+type RestoreTaskInput struct {
+	AccountID string
+	ID        string
+}
+
+func (in *RestoreTaskInput) Normalize() {
+	in.AccountID = strings.TrimSpace(in.AccountID)
+	in.ID = strings.TrimSpace(in.ID)
+}
+
+func (in *RestoreTaskInput) Validate() error {
+	if in.AccountID == "" ||
+		in.ID == "" {
+		return ErrInvalidInput
+	}
+	return nil
+}
+
+func (s *Service) RestoreTask(
+	input RestoreTaskInput,
+) (
+	*Task,
+	error,
+) {
+	input.Normalize()
+	if err := input.Validate(); err != nil {
+		return nil, err
+	}
+
+	task, err := s.store.RestoreTask(input.AccountID, input.ID)
 	if err != nil {
 		return nil, mapStoreError(err)
 	}

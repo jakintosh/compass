@@ -205,3 +205,120 @@ func TestAddWorkLogForProject_MissingProjectDoesNotCreateLog(t *testing.T) {
 		t.Fatalf("missing project logs = %#v, want none", logs)
 	}
 }
+
+func TestWorkLogs_FollowCurrentAttributionAfterTaskMove(t *testing.T) {
+	db := setupDB(t)
+	accountID := seedAccount(t, db, "alice")
+	categoryID := seedCategory(t, db, accountID, "Category")
+	sourceProjectID := seedProject(t, db, accountID, categoryID, "Source")
+	targetProjectID := seedProject(t, db, accountID, categoryID, "Target")
+	taskID := seedTask(t, db, accountID, sourceProjectID, "Task")
+	createdAt := fixedTime(0)
+
+	workLog, err := db.AddWorkLogForTask(accountID, taskID, 1, "Task work", 25, &createdAt)
+	if err != nil {
+		t.Fatalf("add task work log: %v", err)
+	}
+	if _, err := db.MoveTask(accountID, taskID, targetProjectID, 0); err != nil {
+		t.Fatalf("move task: %v", err)
+	}
+
+	sourceLogs, err := db.GetWorkLogsForProject(accountID, sourceProjectID)
+	if err != nil {
+		t.Fatalf("get source project logs: %v", err)
+	}
+	if len(sourceLogs) != 0 {
+		t.Fatalf("source project logs = %#v, want none", sourceLogs)
+	}
+
+	targetLogs, err := db.GetWorkLogsForProject(accountID, targetProjectID)
+	if err != nil {
+		t.Fatalf("get target project logs: %v", err)
+	}
+	if len(targetLogs) != 1 || targetLogs[0].ID != workLog.ID {
+		t.Fatalf("target project logs = %#v, want moved task log %q", targetLogs, workLog.ID)
+	}
+	if targetLogs[0].ProjectID != targetProjectID {
+		t.Fatalf("derived work log project ID = %q, want %q", targetLogs[0].ProjectID, targetProjectID)
+	}
+}
+
+func TestWorkLogs_FollowCurrentAttributionAfterProjectMove(t *testing.T) {
+	db := setupDB(t)
+	accountID := seedAccount(t, db, "alice")
+	sourceCategoryID := seedCategory(t, db, accountID, "Source")
+	targetCategoryID := seedCategory(t, db, accountID, "Target")
+	projectID := seedProject(t, db, accountID, sourceCategoryID, "Project")
+	taskID := seedTask(t, db, accountID, projectID, "Task")
+	createdAt := fixedTime(0)
+
+	projectLog, err := db.AddWorkLogForProject(accountID, projectID, 1, "Project work", 25, &createdAt)
+	if err != nil {
+		t.Fatalf("add project work log: %v", err)
+	}
+	taskLog, err := db.AddWorkLogForTask(accountID, taskID, 1, "Task work", 50, &createdAt)
+	if err != nil {
+		t.Fatalf("add task work log: %v", err)
+	}
+	if _, err := db.MoveProject(accountID, projectID, targetCategoryID, 0); err != nil {
+		t.Fatalf("move project: %v", err)
+	}
+
+	sourceLogs, err := db.GetWorkLogsForCategory(accountID, sourceCategoryID)
+	if err != nil {
+		t.Fatalf("get source category logs: %v", err)
+	}
+	if len(sourceLogs) != 0 {
+		t.Fatalf("source category logs = %#v, want none", sourceLogs)
+	}
+
+	targetLogs, err := db.GetWorkLogsForCategory(accountID, targetCategoryID)
+	if err != nil {
+		t.Fatalf("get target category logs: %v", err)
+	}
+	if len(targetLogs) != 2 {
+		t.Fatalf("target category log count = %d, want 2", len(targetLogs))
+	}
+	got := map[string]bool{targetLogs[0].ID: true, targetLogs[1].ID: true}
+	if !got[projectLog.ID] || !got[taskLog.ID] {
+		t.Fatalf("target category logs = %#v, want project log %q and task log %q", targetLogs, projectLog.ID, taskLog.ID)
+	}
+	for _, log := range targetLogs {
+		if log.CategoryID != targetCategoryID {
+			t.Fatalf("derived work log category ID = %q, want %q", log.CategoryID, targetCategoryID)
+		}
+	}
+}
+
+func TestWorkLogs_RemainQueryableWhenParentIsArchived(t *testing.T) {
+	db := setupDB(t)
+	accountID := seedAccount(t, db, "alice")
+	categoryID := seedCategory(t, db, accountID, "Category")
+	projectID := seedProject(t, db, accountID, categoryID, "Project")
+	taskID := seedTask(t, db, accountID, projectID, "Task")
+	createdAt := fixedTime(0)
+
+	projectLog, err := db.AddWorkLogForProject(accountID, projectID, 1, "Project work", 25, &createdAt)
+	if err != nil {
+		t.Fatalf("add project work log: %v", err)
+	}
+	taskLog, err := db.AddWorkLogForTask(accountID, taskID, 1, "Task work", 50, &createdAt)
+	if err != nil {
+		t.Fatalf("add task work log: %v", err)
+	}
+	if _, err := db.ArchiveProject(accountID, projectID); err != nil {
+		t.Fatalf("archive project: %v", err)
+	}
+
+	projectLogs, err := db.GetWorkLogsForProject(accountID, projectID)
+	if err != nil {
+		t.Fatalf("get project work logs: %v", err)
+	}
+	if len(projectLogs) != 2 {
+		t.Fatalf("project log count = %d, want 2", len(projectLogs))
+	}
+	got := map[string]bool{projectLogs[0].ID: true, projectLogs[1].ID: true}
+	if !got[projectLog.ID] || !got[taskLog.ID] {
+		t.Fatalf("project logs = %#v, want project log %q and task log %q", projectLogs, projectLog.ID, taskLog.ID)
+	}
+}

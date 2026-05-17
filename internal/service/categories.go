@@ -3,13 +3,19 @@ package service
 import (
 	"slices"
 	"strings"
+	"time"
 )
 
 type Category struct {
 	ID          string     `json:"id"`
 	Name        string     `json:"name"`
 	Description string     `json:"description"`
+	Status      string     `json:"status"`
 	Public      bool       `json:"public"`
+	CreatedAt   time.Time  `json:"created_at"`
+	UpdatedAt   time.Time  `json:"updated_at"`
+	ArchivedAt  *time.Time `json:"archived_at,omitempty"`
+	DeletedAt   *time.Time `json:"deleted_at,omitempty"`
 	Projects    []*Project `json:"projects"`
 	WorkLogs    []*WorkLog `json:"work_logs,omitempty"`
 }
@@ -173,6 +179,7 @@ type UpdateCategoryInput struct {
 	ID          string
 	Name        *string
 	Description *string
+	Status      *string
 	Public      *bool
 }
 
@@ -195,6 +202,9 @@ func (in *UpdateCategoryInput) Validate() error {
 		return ErrInvalidInput
 	}
 	if in.Name != nil && *in.Name == "" {
+		return ErrInvalidInput
+	}
+	if in.Status != nil && !validStatus(*in.Status) {
 		return ErrInvalidInput
 	}
 	return nil
@@ -225,8 +235,85 @@ func (s *Service) UpdateCategory(
 	if input.Public != nil {
 		cat.Public = *input.Public
 	}
+	if input.Status != nil {
+		cat.Status = *input.Status
+	}
 
 	cat, err = s.store.UpdateCategory(input.AccountID, cat)
+	if err != nil {
+		return nil, mapStoreError(err)
+	}
+
+	return cat, nil
+}
+
+type ArchiveCategoryInput struct {
+	AccountID string
+	ID        string
+}
+
+func (in *ArchiveCategoryInput) Normalize() {
+	in.AccountID = strings.TrimSpace(in.AccountID)
+	in.ID = strings.TrimSpace(in.ID)
+}
+
+func (in *ArchiveCategoryInput) Validate() error {
+	if in.AccountID == "" ||
+		in.ID == "" {
+		return ErrInvalidInput
+	}
+	return nil
+}
+
+func (s *Service) ArchiveCategory(
+	input ArchiveCategoryInput,
+) (
+	*Category,
+	error,
+) {
+	input.Normalize()
+	if err := input.Validate(); err != nil {
+		return nil, err
+	}
+
+	cat, err := s.store.ArchiveCategory(input.AccountID, input.ID)
+	if err != nil {
+		return nil, mapStoreError(err)
+	}
+
+	return cat, nil
+}
+
+type RestoreCategoryInput struct {
+	AccountID string
+	ID        string
+}
+
+func (in *RestoreCategoryInput) Normalize() {
+	in.AccountID = strings.TrimSpace(in.AccountID)
+	in.ID = strings.TrimSpace(in.ID)
+}
+
+func (in *RestoreCategoryInput) Validate() error {
+	if in.AccountID == "" ||
+		in.ID == "" {
+		return ErrInvalidInput
+	}
+	return nil
+}
+
+func (s *Service) RestoreCategory(
+	input RestoreCategoryInput,
+) (
+	*Category,
+	error,
+) {
+	input.Normalize()
+	if err := input.Validate(); err != nil {
+		return nil, err
+	}
+
+	cat, err := s.store.RestoreCategory(input.AccountID, input.ID)
 	if err != nil {
 		return nil, mapStoreError(err)
 	}

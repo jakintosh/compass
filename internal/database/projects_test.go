@@ -112,6 +112,107 @@ func TestReorderProjects_ChangesOnlyCategoryOrdering(t *testing.T) {
 	}
 }
 
+func TestMoveProject_ChangesCategoryAndTargetOrdering(t *testing.T) {
+	db := setupDB(t)
+	accountID := seedAccount(t, db, "alice")
+	sourceCategoryID := seedCategory(t, db, accountID, "Source")
+	targetCategoryID := seedCategory(t, db, accountID, "Target")
+	movedProjectID := seedProject(t, db, accountID, sourceCategoryID, "Moved")
+	firstTargetID := seedProject(t, db, accountID, targetCategoryID, "First Target")
+	secondTargetID := seedProject(t, db, accountID, targetCategoryID, "Second Target")
+
+	moved, err := db.MoveProject(accountID, movedProjectID, targetCategoryID, 1)
+	if err != nil {
+		t.Fatalf("move project: %v", err)
+	}
+	if moved.CategoryID != targetCategoryID {
+		t.Fatalf("moved project category = %q, want %q", moved.CategoryID, targetCategoryID)
+	}
+
+	source, err := db.GetCategory(accountID, sourceCategoryID)
+	if err != nil {
+		t.Fatalf("get source category: %v", err)
+	}
+	if len(source.Projects) != 0 {
+		t.Fatalf("source projects = %#v, want none", source.Projects)
+	}
+
+	target, err := db.GetCategory(accountID, targetCategoryID)
+	if err != nil {
+		t.Fatalf("get target category: %v", err)
+	}
+	got := []string{target.Projects[0].ID, target.Projects[1].ID, target.Projects[2].ID}
+	want := []string{firstTargetID, movedProjectID, secondTargetID}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("target order = %#v, want %#v", got, want)
+		}
+	}
+}
+
+func TestMoveProject_ReordersWithinSameCategory(t *testing.T) {
+	db := setupDB(t)
+	accountID := seedAccount(t, db, "alice")
+	categoryID := seedCategory(t, db, accountID, "Category")
+	firstID := seedProject(t, db, accountID, categoryID, "First")
+	secondID := seedProject(t, db, accountID, categoryID, "Second")
+	thirdID := seedProject(t, db, accountID, categoryID, "Third")
+
+	if _, err := db.MoveProject(accountID, thirdID, categoryID, 0); err != nil {
+		t.Fatalf("move project within category: %v", err)
+	}
+
+	category, err := db.GetCategory(accountID, categoryID)
+	if err != nil {
+		t.Fatalf("get category: %v", err)
+	}
+	got := []string{category.Projects[0].ID, category.Projects[1].ID, category.Projects[2].ID}
+	want := []string{thirdID, firstID, secondID}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("project order = %#v, want %#v", got, want)
+		}
+	}
+}
+
+func TestMoveProject_ClampsLargeTargetIndexToEnd(t *testing.T) {
+	db := setupDB(t)
+	accountID := seedAccount(t, db, "alice")
+	sourceCategoryID := seedCategory(t, db, accountID, "Source")
+	targetCategoryID := seedCategory(t, db, accountID, "Target")
+	movedID := seedProject(t, db, accountID, sourceCategoryID, "Moved")
+	firstTargetID := seedProject(t, db, accountID, targetCategoryID, "First Target")
+
+	if _, err := db.MoveProject(accountID, movedID, targetCategoryID, 99); err != nil {
+		t.Fatalf("move project: %v", err)
+	}
+
+	target, err := db.GetCategory(accountID, targetCategoryID)
+	if err != nil {
+		t.Fatalf("get target category: %v", err)
+	}
+	got := []string{target.Projects[0].ID, target.Projects[1].ID}
+	want := []string{firstTargetID, movedID}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("project order = %#v, want %#v", got, want)
+		}
+	}
+}
+
+func TestMoveProject_RequiresTargetCategoryInSameAccount(t *testing.T) {
+	db := setupDB(t)
+	aliceID := seedAccount(t, db, "alice")
+	bobID := seedAccount(t, db, "bob")
+	aliceCategoryID := seedCategory(t, db, aliceID, "Alice")
+	bobCategoryID := seedCategory(t, db, bobID, "Bob")
+	projectID := seedProject(t, db, aliceID, aliceCategoryID, "Project")
+
+	if _, err := db.MoveProject(aliceID, projectID, bobCategoryID, 0); err == nil {
+		t.Fatal("MoveProject to another account's category succeeded; want error")
+	}
+}
+
 func TestGetProject_ScopesByAccount(t *testing.T) {
 	db := setupDB(t)
 	aliceID := seedAccount(t, db, "alice")

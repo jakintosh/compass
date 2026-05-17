@@ -121,6 +121,113 @@ func TestReorderTasks_ChangesOnlyProjectOrdering(t *testing.T) {
 	}
 }
 
+func TestMoveTask_ChangesProjectCategoryAndTargetOrdering(t *testing.T) {
+	db := setupDB(t)
+	accountID := seedAccount(t, db, "alice")
+	sourceCategoryID := seedCategory(t, db, accountID, "Source Category")
+	targetCategoryID := seedCategory(t, db, accountID, "Target Category")
+	sourceProjectID := seedProject(t, db, accountID, sourceCategoryID, "Source Project")
+	targetProjectID := seedProject(t, db, accountID, targetCategoryID, "Target Project")
+	movedTaskID := seedTask(t, db, accountID, sourceProjectID, "Moved")
+	firstTargetID := seedTask(t, db, accountID, targetProjectID, "First Target")
+	secondTargetID := seedTask(t, db, accountID, targetProjectID, "Second Target")
+
+	moved, err := db.MoveTask(accountID, movedTaskID, targetProjectID, 1)
+	if err != nil {
+		t.Fatalf("move task: %v", err)
+	}
+	if moved.ProjectID != targetProjectID || moved.CategoryID != targetCategoryID {
+		t.Fatalf("moved task project/category = %q/%q, want %q/%q", moved.ProjectID, moved.CategoryID, targetProjectID, targetCategoryID)
+	}
+
+	source, err := db.GetProject(accountID, sourceProjectID)
+	if err != nil {
+		t.Fatalf("get source project: %v", err)
+	}
+	if len(source.Tasks) != 0 {
+		t.Fatalf("source tasks = %#v, want none", source.Tasks)
+	}
+
+	target, err := db.GetProject(accountID, targetProjectID)
+	if err != nil {
+		t.Fatalf("get target project: %v", err)
+	}
+	got := []string{target.Tasks[0].ID, target.Tasks[1].ID, target.Tasks[2].ID}
+	want := []string{firstTargetID, movedTaskID, secondTargetID}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("target order = %#v, want %#v", got, want)
+		}
+	}
+}
+
+func TestMoveTask_ReordersWithinSameProject(t *testing.T) {
+	db := setupDB(t)
+	accountID := seedAccount(t, db, "alice")
+	categoryID := seedCategory(t, db, accountID, "Category")
+	projectID := seedProject(t, db, accountID, categoryID, "Project")
+	firstID := seedTask(t, db, accountID, projectID, "First")
+	secondID := seedTask(t, db, accountID, projectID, "Second")
+	thirdID := seedTask(t, db, accountID, projectID, "Third")
+
+	if _, err := db.MoveTask(accountID, thirdID, projectID, 0); err != nil {
+		t.Fatalf("move task within project: %v", err)
+	}
+
+	project, err := db.GetProject(accountID, projectID)
+	if err != nil {
+		t.Fatalf("get project: %v", err)
+	}
+	got := []string{project.Tasks[0].ID, project.Tasks[1].ID, project.Tasks[2].ID}
+	want := []string{thirdID, firstID, secondID}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("task order = %#v, want %#v", got, want)
+		}
+	}
+}
+
+func TestMoveTask_ClampsLargeTargetIndexToEnd(t *testing.T) {
+	db := setupDB(t)
+	accountID := seedAccount(t, db, "alice")
+	categoryID := seedCategory(t, db, accountID, "Category")
+	sourceProjectID := seedProject(t, db, accountID, categoryID, "Source")
+	targetProjectID := seedProject(t, db, accountID, categoryID, "Target")
+	movedID := seedTask(t, db, accountID, sourceProjectID, "Moved")
+	firstTargetID := seedTask(t, db, accountID, targetProjectID, "First Target")
+
+	if _, err := db.MoveTask(accountID, movedID, targetProjectID, 99); err != nil {
+		t.Fatalf("move task: %v", err)
+	}
+
+	target, err := db.GetProject(accountID, targetProjectID)
+	if err != nil {
+		t.Fatalf("get target project: %v", err)
+	}
+	got := []string{target.Tasks[0].ID, target.Tasks[1].ID}
+	want := []string{firstTargetID, movedID}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("task order = %#v, want %#v", got, want)
+		}
+	}
+}
+
+func TestMoveTask_RequiresTargetProjectInSameAccount(t *testing.T) {
+	db := setupDB(t)
+	aliceID := seedAccount(t, db, "alice")
+	bobID := seedAccount(t, db, "bob")
+	aliceCategoryID := seedCategory(t, db, aliceID, "Alice Category")
+	bobCategoryID := seedCategory(t, db, bobID, "Bob Category")
+	aliceProjectID := seedProject(t, db, aliceID, aliceCategoryID, "Alice Project")
+	bobProjectID := seedProject(t, db, bobID, bobCategoryID, "Bob Project")
+	taskID := seedTask(t, db, aliceID, aliceProjectID, "Task")
+
+	if _, err := db.MoveTask(aliceID, taskID, bobProjectID, 0); err == nil {
+		t.Fatal("MoveTask to another account's project succeeded; want error")
+	}
+}
+
 func TestGetTask_ScopesByAccount(t *testing.T) {
 	db := setupDB(t)
 	aliceID := seedAccount(t, db, "alice")

@@ -3,6 +3,7 @@ package database
 import (
 	"database/sql"
 	"fmt"
+	"time"
 
 	"git.sr.ht/~jakintosh/compass/internal/service"
 	"github.com/google/uuid"
@@ -53,9 +54,9 @@ func (db *DB) GetCategory(
 	error,
 ) {
 	row := db.Conn.QueryRow(`
-		SELECT id, name, description, public
+		SELECT id, name, description, status, public, created_at, updated_at, archived_at, deleted_at
 		FROM categories
-		WHERE account_id = ?1 AND id = ?2`,
+		WHERE account_id = ?1 AND id = ?2 AND deleted_at IS NULL`,
 		accountID,
 		id,
 	)
@@ -82,6 +83,7 @@ func (db *DB) AddCategory(
 	error,
 ) {
 	id := uuid.NewString()
+	now := time.Now().Unix()
 
 	var minOrder sql.NullInt64
 	if err := db.Conn.QueryRow(`
@@ -94,19 +96,32 @@ func (db *DB) AddCategory(
 	}
 	order := int(minOrder.Int64) - 1
 
-	row := db.Conn.QueryRow(`
-		INSERT INTO categories (id, account_id, name, sort_order)
-		VALUES (?1, ?2, ?3, ?4)
-		RETURNING id, name, description, public`,
+	tx, err := db.Conn.Begin()
+	if err != nil {
+		return nil, fmt.Errorf("begin add category tx: %w", err)
+	}
+	defer tx.Rollback()
+
+	row := tx.QueryRow(`
+		INSERT INTO categories (id, account_id, name, sort_order, created_at, updated_at)
+		VALUES (?1, ?2, ?3, ?4, ?5, ?5)
+		RETURNING id, name, description, status, public, created_at, updated_at, archived_at, deleted_at`,
 		id,
 		accountID,
 		name,
 		order,
+		now,
 	)
 
 	cat, err := scanCategory(row)
 	if err != nil {
 		return nil, fmt.Errorf("add category: %w", err)
+	}
+	if err := db.sqlInsertEventTx(tx, accountID, "category", id, "category.created", "{}"); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("commit add category tx: %w", err)
 	}
 
 	cat.Projects = []*service.Project{}
@@ -124,12 +139,16 @@ func (db *DB) UpdateCategory(
 		UPDATE categories
 		SET name = ?1,
 			description = ?2,
-			public = ?3
-		WHERE account_id = ?4 AND id = ?5
-		RETURNING id, name, description, public`,
+			status = ?3,
+			public = ?4,
+			updated_at = ?5
+		WHERE account_id = ?6 AND id = ?7
+		RETURNING id, name, description, status, public, created_at, updated_at, archived_at, deleted_at`,
 		cat.Name,
 		cat.Description,
+		cat.Status,
 		cat.Public,
+		time.Now().Unix(),
 		accountID,
 		cat.ID,
 	)
@@ -148,6 +167,73 @@ func (db *DB) UpdateCategory(
 	return updated, nil
 }
 
+func (db *DB) ArchiveCategory(
+	accountID string,
+	id string,
+) (
+	*service.Category,
+	error,
+) {
+	return db.setCategoryStatus(accountID, id, "archived")
+}
+
+func (db *DB) RestoreCategory(
+	accountID string,
+	id string,
+) (
+	*service.Category,
+	error,
+) {
+	return db.setCategoryStatus(accountID, id, "active")
+}
+
+func (db *DB) setCategoryStatus(
+	accountID string,
+	id string,
+	status string,
+) (
+	*service.Category,
+	error,
+) {
+	tx, err := db.Conn.Begin()
+	if err != nil {
+		return nil, fmt.Errorf("begin set category status tx: %w", err)
+	}
+	defer tx.Rollback()
+
+	now := time.Now().Unix()
+	var archivedAt any
+	if status == "archived" {
+		archivedAt = now
+	}
+
+	row := tx.QueryRow(`
+		UPDATE categories
+		SET status = ?1,
+			updated_at = ?2,
+			archived_at = ?3
+		WHERE account_id = ?4 AND id = ?5 AND deleted_at IS NULL
+		RETURNING id, name, description, status, public, created_at, updated_at, archived_at, deleted_at`,
+		status,
+		now,
+		archivedAt,
+		accountID,
+		id,
+	)
+	cat, err := scanCategory(row)
+	if err != nil {
+		return nil, fmt.Errorf("set category status %q: %w", id, err)
+	}
+	if err := db.sqlInsertEventTx(tx, accountID, "category", id, "category.status_changed", fmt.Sprintf(`{"to_status":%q}`, status)); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("commit set category status tx: %w", err)
+	}
+	cat.Projects = []*service.Project{}
+	return cat, nil
+}
+
 func (db *DB) DeleteCategory(
 	accountID string,
 	id string,
@@ -158,7 +244,7 @@ func (db *DB) DeleteCategory(
 	row := db.Conn.QueryRow(`
 		DELETE FROM categories
 		WHERE account_id = ?1 AND id = ?2
-		RETURNING id, name, description, public`,
+		RETURNING id, name, description, status, public, created_at, updated_at, archived_at, deleted_at`,
 		accountID,
 		id,
 	)
@@ -209,9 +295,9 @@ func (db *DB) sqlListCategoriesTx(
 	error,
 ) {
 	rows, err := tx.Query(`
-		SELECT id, name, description, public
+		SELECT id, name, description, status, public, created_at, updated_at, archived_at, deleted_at
 		FROM categories
-		WHERE account_id = ?1
+		WHERE account_id = ?1 AND status = 'active' AND deleted_at IS NULL
 		ORDER BY sort_order ASC`,
 		accountID,
 	)
@@ -223,14 +309,27 @@ func (db *DB) sqlListCategoriesTx(
 	var categories []*service.Category
 	for rows.Next() {
 		var cat service.Category
+		var createdAt int64
+		var updatedAt int64
+		var archivedAt sql.NullInt64
+		var deletedAt sql.NullInt64
 		if err := rows.Scan(
 			&cat.ID,
 			&cat.Name,
 			&cat.Description,
+			&cat.Status,
 			&cat.Public,
+			&createdAt,
+			&updatedAt,
+			&archivedAt,
+			&deletedAt,
 		); err != nil {
 			return nil, fmt.Errorf("scan category row: %w", err)
 		}
+		cat.CreatedAt = time.Unix(createdAt, 0)
+		cat.UpdatedAt = time.Unix(updatedAt, 0)
+		cat.ArchivedAt = nullableUnixTime(archivedAt)
+		cat.DeletedAt = nullableUnixTime(deletedAt)
 		cat.Projects = []*service.Project{}
 		categories = append(categories, &cat)
 	}
@@ -255,12 +354,21 @@ func (db *DB) sqlListProjectsByCategoryTx(
 			t.category_id,
 			t.name,
 			t.description,
+			t.status,
 			t.completion,
 			t.public,
-			c.public AS parent_public
+			c.public AS parent_public,
+			t.created_at,
+			t.updated_at,
+			t.archived_at,
+			t.deleted_at
 		FROM projects t
 		JOIN categories c ON t.category_id = c.id
 		WHERE t.account_id = ?1
+			AND t.status = 'active'
+			AND t.deleted_at IS NULL
+			AND c.status = 'active'
+			AND c.deleted_at IS NULL
 		ORDER BY t.sort_order ASC`,
 		accountID,
 	)
@@ -299,16 +407,27 @@ func (db *DB) sqlListTasksByProjectTx(
 		SELECT
 			s.id,
 			s.project_id,
-			s.category_id,
+			t.category_id,
 			s.name,
 			s.description,
+			s.status,
 			s.completion,
 			s.public,
-			(c.public AND t.public) AS parent_public
+			(c.public AND t.public) AS parent_public,
+			s.created_at,
+			s.updated_at,
+			s.archived_at,
+			s.deleted_at
 		FROM tasks s
 		JOIN projects t ON s.project_id = t.id
-		JOIN categories c ON s.category_id = c.id
+		JOIN categories c ON t.category_id = c.id
 		WHERE s.account_id = ?1
+			AND s.status = 'active'
+			AND s.deleted_at IS NULL
+			AND t.status = 'active'
+			AND t.deleted_at IS NULL
+			AND c.status = 'active'
+			AND c.deleted_at IS NULL
 		ORDER BY s.sort_order ASC`,
 		accountID,
 	)
@@ -345,12 +464,21 @@ func (db *DB) getProjectsForCategory(
 			t.category_id,
 			t.name,
 			t.description,
+			t.status,
 			t.completion,
 			t.public,
-			c.public AS parent_public
+			c.public AS parent_public,
+			t.created_at,
+			t.updated_at,
+			t.archived_at,
+			t.deleted_at
 		FROM projects t
 		JOIN categories c ON t.category_id = c.id
 		WHERE t.account_id = ?1 AND t.category_id = ?2
+			AND t.status = 'active'
+			AND t.deleted_at IS NULL
+			AND c.status = 'active'
+			AND c.deleted_at IS NULL
 		ORDER BY t.sort_order ASC`,
 		accountID,
 		catID,
@@ -394,16 +522,27 @@ func (db *DB) getTasksForProject(
 		SELECT
 			s.id,
 			s.project_id,
-			s.category_id,
+			t.category_id,
 			s.name,
 			s.description,
+			s.status,
 			s.completion,
 			s.public,
-			(c.public AND t.public) AS parent_public
+			(c.public AND t.public) AS parent_public,
+			s.created_at,
+			s.updated_at,
+			s.archived_at,
+			s.deleted_at
 		FROM tasks s
 		JOIN projects t ON s.project_id = t.id
-		JOIN categories c ON s.category_id = c.id
+		JOIN categories c ON t.category_id = c.id
 		WHERE s.account_id = ?1 AND s.project_id = ?2
+			AND s.status = 'active'
+			AND s.deleted_at IS NULL
+			AND t.status = 'active'
+			AND t.deleted_at IS NULL
+			AND c.status = 'active'
+			AND c.deleted_at IS NULL
 		ORDER BY s.sort_order ASC`,
 		accountID,
 		projectID,
@@ -435,14 +574,27 @@ func scanCategory(
 	error,
 ) {
 	var cat service.Category
+	var createdAt int64
+	var updatedAt int64
+	var archivedAt sql.NullInt64
+	var deletedAt sql.NullInt64
 	if err := row.Scan(
 		&cat.ID,
 		&cat.Name,
 		&cat.Description,
+		&cat.Status,
 		&cat.Public,
+		&createdAt,
+		&updatedAt,
+		&archivedAt,
+		&deletedAt,
 	); err != nil {
 		return nil, err
 	}
+	cat.CreatedAt = time.Unix(createdAt, 0)
+	cat.UpdatedAt = time.Unix(updatedAt, 0)
+	cat.ArchivedAt = nullableUnixTime(archivedAt)
+	cat.DeletedAt = nullableUnixTime(deletedAt)
 	return &cat, nil
 }
 

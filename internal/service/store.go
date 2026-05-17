@@ -12,18 +12,26 @@ type Store interface {
 	AddCategory(accountID string, name string) (*Category, error)
 	UpdateCategory(accountID string, cat *Category) (*Category, error)
 	DeleteCategory(accountID string, id string) (*Category, error)
+	ArchiveCategory(accountID string, id string) (*Category, error)
+	RestoreCategory(accountID string, id string) (*Category, error)
 	ReorderCategories(accountID string, ids []string) error
 
 	GetProject(accountID string, id string) (*Project, error)
 	AddProject(accountID string, catID string, name string) (*Project, error)
 	UpdateProject(accountID string, project *Project) (*Project, error)
 	DeleteProject(accountID string, id string) (*Project, error)
+	MoveProject(accountID string, projectID string, targetCategoryID string, targetIndex int) (*Project, error)
+	ArchiveProject(accountID string, id string) (*Project, error)
+	RestoreProject(accountID string, id string) (*Project, error)
 	ReorderProjects(accountID string, catID string, projectIDs []string) error
 
 	GetTask(accountID string, id string) (*Task, error)
 	AddTask(accountID string, projectID string, name string) (*Task, error)
 	UpdateTask(accountID string, task *Task) (*Task, error)
 	DeleteTask(accountID string, id string) (*Task, error)
+	MoveTask(accountID string, taskID string, targetProjectID string, targetIndex int) (*Task, error)
+	ArchiveTask(accountID string, id string) (*Task, error)
+	RestoreTask(accountID string, id string) (*Task, error)
 	ReorderTasks(accountID string, projectID string, taskIDs []string) error
 
 	AddWorkLogForProject(accountID string, projectID string, hoursWorked float64, workDescription string, completionEstimate int, customTime *time.Time) (*WorkLog, error)
