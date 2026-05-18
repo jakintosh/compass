@@ -16,6 +16,7 @@ COPY --from=build /out/compass /app/compass
 COPY internal/app/templates /app/internal/app/templates
 COPY internal/app/static /app/internal/app/static
 
-EXPOSE 8080
+EXPOSE 80
+VOLUME ["/app/data"]
 ENTRYPOINT ["/app/compass"]
-CMD ["serve"]
+CMD ["serve", "--addr", ":80", "--data-dir", "/app/data"]

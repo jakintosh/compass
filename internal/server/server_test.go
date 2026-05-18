@@ -3,6 +3,7 @@ package server
 import (
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"testing"
 )
@@ -55,14 +56,19 @@ func TestBuildAuthorizeURL(t *testing.T) {
 func TestBuildHandlerMountsAuthAndAppRoutes(t *testing.T) {
 	dir := t.TempDir()
 	handler, cleanup, err := BuildHandler(Options{
-		Dev:        true,
-		DBPath:     filepath.Join(dir, "compass.db"),
-		DevKeyPath: filepath.Join(dir, "dev.key"),
+		Dev:     true,
+		DataDir: dir,
 	})
 	if err != nil {
 		t.Fatalf("BuildHandler returned error: %v", err)
 	}
 	defer cleanup()
+
+	for _, name := range []string{"compass.db", "dev.key"} {
+		if _, err := os.Stat(filepath.Join(dir, name)); err != nil {
+			t.Fatalf("expected %s in data dir: %v", name, err)
+		}
+	}
 
 	tests := []struct {
 		name   string

@@ -1,12 +1,15 @@
 GO := go
 APP := compass
+DOCKER := docker
+IMAGE := $(APP):latest
 BIN_DIR := ./bin
 BIN := $(BIN_DIR)/$(APP)
-DATA_DIR := ./data
+HOST_DATA_DIR := ./data
+HOST_DATA_MOUNT := $(abspath $(HOST_DATA_DIR))
+CONTAINER_DATA_DIR := /app/data
 
-ADDR ?= :8080
-DB_PATH ?= $(DATA_DIR)/compass.db
-DEV_KEY_PATH ?= $(DATA_DIR)/dev.key
+HOST_PORT ?= 8080
+CONTAINER_PORT ?= 80
 
 .DEFAULT_GOAL := help
 
@@ -14,7 +17,7 @@ DEV_KEY_PATH ?= $(DATA_DIR)/dev.key
 
 help:
 	printf "Targets:\n"
-	printf "  build    Build $(BIN)\n"
+	printf "  build    Build the Docker image $(IMAGE)\n"
 	printf "  generate Refresh generated source\n"
 	printf "  test     Run tests\n"
 	printf "  fmt      Format Go source\n"
@@ -22,13 +25,12 @@ help:
 	printf "  lint     Run formatting and static checks\n"
 	printf "  install  Install the CLI binary\n"
 	printf "  init     Create local runtime directories\n"
-	printf "  run      Run the local service in dev auth mode\n"
+	printf "  run      Run the Docker image in dev auth mode\n"
 	printf "  clean    Remove build and test artifacts\n"
 	printf "  reset    Remove local runtime state\n"
 
 build: generate
-	mkdir -p $(BIN_DIR)
-	$(GO) build -o $(BIN) ./cmd/$(APP)
+	$(DOCKER) build -t $(IMAGE) .
 
 generate:
 	$(GO) generate ./...
@@ -48,13 +50,16 @@ install:
 	$(GO) install ./cmd/$(APP)
 
 init:
-	mkdir -p $(DATA_DIR)
+	mkdir -p $(HOST_DATA_DIR)
 
 run: build init
-	$(BIN) serve --dev --addr $(ADDR) --db-path $(DB_PATH) --dev-key-path $(DEV_KEY_PATH)
+	$(DOCKER) run --rm -it \
+		-p $(HOST_PORT):$(CONTAINER_PORT) \
+		-v "$(HOST_DATA_MOUNT):$(CONTAINER_DATA_DIR)" \
+		$(IMAGE) serve --dev --addr :$(CONTAINER_PORT) --data-dir $(CONTAINER_DATA_DIR)
 
 clean:
 	rm -rf $(BIN_DIR)
 
 reset:
-	rm -rf $(DATA_DIR)
+	rm -rf $(HOST_DATA_DIR)

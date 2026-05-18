@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -25,14 +26,18 @@ import (
 
 type Options struct {
 	Addr            string
-	DBPath          string
+	DataDir         string
 	Dev             bool
-	DevKeyPath      string
 	ConsentURL      string
 	ConsentPubkey   string
 	IntegrationName string
 	PublicURL       string
 }
+
+const (
+	databaseFilename = "compass.db"
+	devKeyFilename   = "dev.key"
+)
 
 type productionAppConfig struct {
 	audience    string
@@ -78,8 +83,16 @@ func BuildHandler(
 	func(),
 	error,
 ) {
+	dataDir := opts.DataDir
+	if dataDir == "" {
+		dataDir = "."
+	}
+	if err := os.MkdirAll(dataDir, 0o755); err != nil {
+		return nil, nil, fmt.Errorf("failed to create data directory: %w", err)
+	}
+
 	dbOpts := database.Options{
-		Path: opts.DBPath,
+		Path: filepath.Join(dataDir, databaseFilename),
 		WAL:  true,
 	}
 	db, err := database.Open(dbOpts)
@@ -147,7 +160,12 @@ func buildDevAuthConfig(
 	authConfig,
 	error,
 ) {
-	key, err := getOrGenerateDevKey(opts.DevKeyPath)
+	dataDir := opts.DataDir
+	if dataDir == "" {
+		dataDir = "."
+	}
+
+	key, err := getOrGenerateDevKey(filepath.Join(dataDir, devKeyFilename))
 	if err != nil {
 		return authConfig{}, fmt.Errorf("failed to get/generate dev key: %w", err)
 	}

@@ -28,10 +28,11 @@ make run
 
 The application will be available at `http://localhost:8080`.
 
-For local development without a Consent server, run Compass in dev auth mode:
+For local development without a Consent server, `make run` runs the Docker image
+in dev auth mode. To run the binary directly:
 
 ```bash
-go run ./cmd/compass serve --dev
+go run ./cmd/compass serve --dev --data-dir ./data
 ```
 
 For a production Consent integration, register this app from its well-known
@@ -44,6 +45,21 @@ CONSENT_PUBKEY="$(cat /path/to/consent/public.pem)" \
 PUBLIC_URL=https://your-compass-host \
 CONSENT_INTEGRATION=compass \
 go run ./cmd/compass serve
+```
+
+The Docker image defaults to production mode on port 80 and stores runtime state
+in `/app/data`, so production containers can provide the same Consent settings
+through environment variables:
+
+```bash
+docker run --rm \
+  -p 8080:80 \
+  -v "$PWD/data:/app/data" \
+  -e CONSENT_URL=https://consent.example.com \
+  -e CONSENT_PUBKEY="$(cat /path/to/consent/public.pem)" \
+  -e PUBLIC_URL=https://your-compass-host \
+  -e CONSENT_INTEGRATION=compass \
+  compass:latest
 ```
 
 `PUBLIC_URL` is used to publish the manifest, callback URL, logo URL, and JWT

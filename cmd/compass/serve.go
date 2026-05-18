@@ -20,14 +20,9 @@ var serveCmd = &args.Command{
 			Help: "listen address (env: ADDR)",
 		},
 		{
-			Long: "db-path",
+			Long: "data-dir",
 			Type: args.OptionTypeParameter,
-			Help: "database file path (env: DB_PATH)",
-		},
-		{
-			Long: "dev-key-path",
-			Type: args.OptionTypeParameter,
-			Help: "development auth key path (env: DEV_KEY_PATH)",
+			Help: "runtime data directory (env: DATA_DIR)",
 		},
 		{
 			Long: "consent-url",
@@ -54,8 +49,7 @@ var serveCmd = &args.Command{
 		opts := server.Options{
 			Dev:             i.GetFlag("dev"),
 			Addr:            cascadeParameter(i, "addr", "ADDR", ":8080"),
-			DBPath:          cascadeParameter(i, "db-path", "DB_PATH", "compass.db"),
-			DevKeyPath:      cascadeParameter(i, "dev-key-path", "DEV_KEY_PATH", "dev.key"),
+			DataDir:         cascadeParameter(i, "data-dir", "DATA_DIR", "data"),
 			ConsentURL:      cascadeParameter(i, "consent-url", "CONSENT_URL"),
 			ConsentPubkey:   cascadeParameter(i, "consent-pubkey", "CONSENT_PUBKEY"),
 			IntegrationName: cascadeParameter(i, "integration-name", "CONSENT_INTEGRATION", "compass"),
