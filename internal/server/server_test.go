@@ -1,6 +1,10 @@
 package server
 
 import (
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/x509"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -53,6 +57,26 @@ func TestBuildAuthorizeURL(t *testing.T) {
 	}
 }
 
+func TestLoadConsentPublicKeyFromDERFile(t *testing.T) {
+	key := generateTestKey(t)
+	der, err := x509.MarshalPKIXPublicKey(&key.PublicKey)
+	if err != nil {
+		t.Fatalf("marshal public key: %v", err)
+	}
+
+	filename := filepath.Join(t.TempDir(), "verification_key.der")
+	if err := os.WriteFile(filename, der, 0o644); err != nil {
+		t.Fatalf("write DER file: %v", err)
+	}
+
+	got, err := loadConsentPublicKey(Options{ConsentPubkeyFile: filename})
+	if err != nil {
+		t.Fatalf("loadConsentPublicKey returned error: %v", err)
+	}
+
+	assertSamePublicKey(t, got, &key.PublicKey)
+}
+
 func TestBuildHandlerMountsAuthAndAppRoutes(t *testing.T) {
 	dir := t.TempDir()
 	handler, cleanup, err := BuildHandler(Options{
@@ -64,10 +88,11 @@ func TestBuildHandlerMountsAuthAndAppRoutes(t *testing.T) {
 	}
 	defer cleanup()
 
-	for _, name := range []string{"compass.db", "dev.key"} {
-		if _, err := os.Stat(filepath.Join(dir, name)); err != nil {
-			t.Fatalf("expected %s in data dir: %v", name, err)
-		}
+	if _, err := os.Stat(filepath.Join(dir, "compass.db")); err != nil {
+		t.Fatalf("expected compass.db in data dir: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "dev.key")); !os.IsNotExist(err) {
+		t.Fatalf("dev mode should not persist dev.key, got err: %v", err)
 	}
 
 	tests := []struct {
@@ -113,5 +138,28 @@ func TestBuildHandlerMountsAuthAndAppRoutes(t *testing.T) {
 				t.Fatalf("%s returned 404", tt.path)
 			}
 		})
+	}
+}
+
+func generateTestKey(t *testing.T) *ecdsa.PrivateKey {
+	t.Helper()
+
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatalf("generate key: %v", err)
+	}
+	return key
+}
+
+func assertSamePublicKey(t *testing.T, got *ecdsa.PublicKey, want *ecdsa.PublicKey) {
+	t.Helper()
+
+	if got == nil {
+		t.Fatal("got nil public key")
+	}
+	if got.Curve != want.Curve ||
+		got.X.Cmp(want.X) != 0 ||
+		got.Y.Cmp(want.Y) != 0 {
+		t.Fatalf("public key mismatch")
 	}
 }

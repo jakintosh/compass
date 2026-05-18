@@ -5,7 +5,6 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/x509"
-	"encoding/pem"
 	"fmt"
 	"log"
 	"net/http"
@@ -25,18 +24,17 @@ import (
 )
 
 type Options struct {
-	Addr            string
-	DataDir         string
-	Dev             bool
-	ConsentURL      string
-	ConsentPubkey   string
-	IntegrationName string
-	PublicURL       string
+	Addr              string
+	DataDir           string
+	Dev               bool
+	ConsentURL        string
+	ConsentPubkeyFile string
+	IntegrationName   string
+	PublicURL         string
 }
 
 const (
 	databaseFilename = "compass.db"
-	devKeyFilename   = "dev.key"
 )
 
 type productionAppConfig struct {
@@ -160,14 +158,9 @@ func buildDevAuthConfig(
 	authConfig,
 	error,
 ) {
-	dataDir := opts.DataDir
-	if dataDir == "" {
-		dataDir = "."
-	}
-
-	key, err := getOrGenerateDevKey(filepath.Join(dataDir, devKeyFilename))
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
-		return authConfig{}, fmt.Errorf("failed to get/generate dev key: %w", err)
+		return authConfig{}, fmt.Errorf("failed to generate dev key: %w", err)
 	}
 
 	env := testing.NewTestEnvWithKey(key, "localhost", "compass-dev")
@@ -195,12 +188,12 @@ func buildProductionAuthConfig(
 	error,
 ) {
 	if opts.ConsentURL == "" ||
-		opts.ConsentPubkey == "" ||
+		opts.ConsentPubkeyFile == "" ||
 		opts.PublicURL == "" {
-		return authConfig{}, fmt.Errorf("production mode requires --consent-url, --consent-pubkey, and --public-url")
+		return authConfig{}, fmt.Errorf("production mode requires --consent-url, --consent-pubkey-file, and --public-url")
 	}
 
-	pubKey, err := parsePublicKey(opts.ConsentPubkey)
+	pubKey, err := loadConsentPublicKey(opts)
 	if err != nil {
 		return authConfig{}, fmt.Errorf("failed to parse consent public key: %w", err)
 	}
@@ -350,18 +343,26 @@ func buildAuthorizeURL(
 	return authorizeURL.String()
 }
 
-func parsePublicKey(
-	pemData string,
+func loadConsentPublicKey(
+	opts Options,
 ) (
 	*ecdsa.PublicKey,
 	error,
 ) {
-	block, _ := pem.Decode([]byte(pemData))
-	if block == nil {
-		return nil, fmt.Errorf("failed to decode PEM block")
+	data, err := os.ReadFile(opts.ConsentPubkeyFile)
+	if err != nil {
+		return nil, fmt.Errorf("read %s: %w", opts.ConsentPubkeyFile, err)
 	}
+	return parseDERPublicKey(data)
+}
 
-	pub, err := x509.ParsePKIXPublicKey(block.Bytes)
+func parseDERPublicKey(
+	derData []byte,
+) (
+	*ecdsa.PublicKey,
+	error,
+) {
+	pub, err := x509.ParsePKIXPublicKey(derData)
 	if err != nil {
 		return nil, err
 	}
@@ -372,56 +373,4 @@ func parsePublicKey(
 	}
 
 	return ecdsaPub, nil
-}
-
-func getOrGenerateDevKey(
-	filename string,
-) (
-	*ecdsa.PrivateKey,
-	error,
-) {
-	data, err := os.ReadFile(filename)
-	if err == nil {
-		block, _ := pem.Decode(data)
-		if block == nil {
-			return nil, fmt.Errorf("failed to decode PEM block from %s", filename)
-		}
-		key, err := x509.ParseECPrivateKey(block.Bytes)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse EC private key: %w", err)
-		}
-		log.Printf("Loaded existing dev key from %s", filename)
-		return key, nil
-	}
-
-	if !os.IsNotExist(err) {
-		return nil, fmt.Errorf("failed to read key file: %w", err)
-	}
-
-	log.Printf("Generating new dev key to %s...", filename)
-	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate key: %w", err)
-	}
-
-	bytes, err := x509.MarshalECPrivateKey(key)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal key: %w", err)
-	}
-
-	f, err := os.Create(filename)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create key file: %w", err)
-	}
-	defer f.Close()
-
-	block := pem.Block{
-		Type:  "EC PRIVATE KEY",
-		Bytes: bytes,
-	}
-	if err := pem.Encode(f, &block); err != nil {
-		return nil, fmt.Errorf("failed to write PEM block: %w", err)
-	}
-
-	return key, nil
 }

@@ -30,9 +30,9 @@ var serveCmd = &args.Command{
 			Help: "consent server URL (env: CONSENT_URL)",
 		},
 		{
-			Long: "consent-pubkey",
+			Long: "consent-pubkey-file",
 			Type: args.OptionTypeParameter,
-			Help: "consent server public key PEM (env: CONSENT_PUBKEY)",
+			Help: "consent server public key DER file (env: CONSENT_PUBKEY_FILE)",
 		},
 		{
 			Long: "integration-name",
@@ -47,13 +47,13 @@ var serveCmd = &args.Command{
 	},
 	Handler: func(i *args.Input) error {
 		opts := server.Options{
-			Dev:             i.GetFlag("dev"),
-			Addr:            cascadeParameter(i, "addr", "ADDR", ":8080"),
-			DataDir:         cascadeParameter(i, "data-dir", "DATA_DIR", "data"),
-			ConsentURL:      cascadeParameter(i, "consent-url", "CONSENT_URL"),
-			ConsentPubkey:   cascadeParameter(i, "consent-pubkey", "CONSENT_PUBKEY"),
-			IntegrationName: cascadeParameter(i, "integration-name", "CONSENT_INTEGRATION", "compass"),
-			PublicURL:       cascadeParameter(i, "public-url", "PUBLIC_URL"),
+			Dev:               i.GetFlag("dev"),
+			Addr:              cascadeParameter(i, "addr", "ADDR", ":8080"),
+			DataDir:           cascadeParameter(i, "data-dir", "DATA_DIR", "data"),
+			ConsentURL:        cascadeParameter(i, "consent-url", "CONSENT_URL"),
+			ConsentPubkeyFile: cascadeParameter(i, "consent-pubkey-file", "CONSENT_PUBKEY_FILE"),
+			IntegrationName:   cascadeParameter(i, "integration-name", "CONSENT_INTEGRATION", "compass"),
+			PublicURL:         cascadeParameter(i, "public-url", "PUBLIC_URL"),
 		}
 		return server.Serve(opts)
 	},

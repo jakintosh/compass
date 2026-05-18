@@ -41,7 +41,7 @@ start Compass with:
 
 ```bash
 CONSENT_URL=https://consent.example.com \
-CONSENT_PUBKEY="$(cat /path/to/consent/public.pem)" \
+CONSENT_PUBKEY_FILE=/path/to/consent/verification_key.der \
 PUBLIC_URL=https://your-compass-host \
 CONSENT_INTEGRATION=compass \
 go run ./cmd/compass serve
@@ -55,8 +55,9 @@ through environment variables:
 docker run --rm \
   -p 8080:80 \
   -v "$PWD/data:/app/data" \
+  -v "/path/to/consent/verification_key.der:/run/secrets/verification_key.der:ro" \
   -e CONSENT_URL=https://consent.example.com \
-  -e CONSENT_PUBKEY="$(cat /path/to/consent/public.pem)" \
+  -e CONSENT_PUBKEY_FILE=/run/secrets/verification_key.der \
   -e PUBLIC_URL=https://your-compass-host \
   -e CONSENT_INTEGRATION=compass \
   compass:latest
@@ -66,7 +67,8 @@ docker run --rm \
 audience. The login URL requests the `identity` and `profile` Consent scopes so
 Compass can cache each user's handle for tenant URLs like
 `https://your-compass-host/{handle}/`. The default integration name is
-`compass`.
+`compass`. `CONSENT_PUBKEY_FILE` should point at Consent's generated
+`verification_key.der`.
 
 ## Usage
 
