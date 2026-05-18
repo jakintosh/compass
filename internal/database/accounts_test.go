@@ -1,6 +1,11 @@
 package database_test
 
-import "testing"
+import (
+	"errors"
+	"testing"
+
+	"git.sr.ht/~jakintosh/compass/internal/service"
+)
 
 func TestUpsertAccount_CreatesAndReadsByHandleAndSubject(t *testing.T) {
 	db := setupDB(t)
@@ -76,7 +81,7 @@ func TestUpsertAccount_DuplicateHandleForDifferentSubjectFails(t *testing.T) {
 	if _, err := db.UpsertAccount("subject-alice", "shared", fixedTime(0)); err != nil {
 		t.Fatalf("seed account: %v", err)
 	}
-	if _, err := db.UpsertAccount("subject-bob", "shared", fixedTime(1)); err == nil {
-		t.Fatal("UpsertAccount with duplicate handle succeeded; want error")
+	if _, err := db.UpsertAccount("subject-bob", "shared", fixedTime(1)); !errors.Is(err, service.ErrAccountHandleConflict) {
+		t.Fatalf("UpsertAccount with duplicate handle error = %v, want ErrAccountHandleConflict", err)
 	}
 }

@@ -7,9 +7,10 @@ import (
 )
 
 var (
-	ErrForbidden    = errors.New("forbidden")
-	ErrInvalidInput = errors.New("invalid input")
-	ErrNotFound     = errors.New("not found")
+	ErrAccountHandleConflict = errors.New("account handle conflict")
+	ErrForbidden             = errors.New("forbidden")
+	ErrInvalidInput          = errors.New("invalid input")
+	ErrNotFound              = errors.New("not found")
 )
 
 func mapStoreError(
@@ -20,6 +21,9 @@ func mapStoreError(
 	}
 	if errors.Is(err, sql.ErrNoRows) {
 		return ErrNotFound
+	}
+	if errors.Is(err, ErrAccountHandleConflict) {
+		return ErrAccountHandleConflict
 	}
 	if strings.Contains(strings.ToLower(err.Error()), "not found") {
 		return ErrNotFound

@@ -187,7 +187,20 @@ func (s *App) getAuthContext(
 	w http.ResponseWriter,
 	r *http.Request,
 ) AuthContext {
-	// Build base context with auth URLs
+	ctx, err := s.resolveAuthContext(w, r)
+	if err != nil {
+		log.Printf("failed to resolve authenticated account: %v", err)
+	}
+	return ctx
+}
+
+func (s *App) resolveAuthContext(
+	w http.ResponseWriter,
+	r *http.Request,
+) (
+	AuthContext,
+	error,
+) {
 	ctx := AuthContext{
 		IsAuthenticated: false,
 		LoginURL:        s.loginURL(r),
@@ -196,7 +209,7 @@ func (s *App) getAuthContext(
 
 	accessToken, csrfToken, err := s.auth.Verifier.VerifyAuthorizationGetCSRF(w, r)
 	if err != nil {
-		return ctx
+		return ctx, nil
 	}
 
 	ctx.IsAuthenticated = true
@@ -207,11 +220,9 @@ func (s *App) getAuthContext(
 	if err == nil && account != nil {
 		ctx.AccountID = account.ID
 		ctx.Handle = account.Handle
-	} else {
-		log.Printf("failed to resolve authenticated account: %v", err)
-		ctx.Handle = accessToken.Subject()
+		return ctx, nil
 	}
-	return ctx
+	return ctx, err
 }
 
 // requireAuth verifies auth and CSRF for destructive operations.
@@ -248,7 +259,7 @@ func (s *App) requireAuth(
 	}
 	account, err := s.accountForToken(accessToken)
 	if err != nil {
-		http.Error(w, "Unable to resolve account", http.StatusUnauthorized)
+		s.renderAccountSetupFailure(w, r, auth, err)
 		return AuthContext{}, false
 	}
 	auth.AccountID = account.ID
@@ -260,7 +271,12 @@ func (s *App) handleIndex(
 	w http.ResponseWriter,
 	r *http.Request,
 ) {
-	auth := s.getAuthContext(w, r)
+	auth, setupErr := s.resolveAuthContext(w, r)
+	if setupErr != nil {
+		log.Printf("failed to resolve authenticated account: %v", setupErr)
+		s.renderAccountSetupFailure(w, r, auth, setupErr)
+		return
+	}
 	if auth.IsAuthenticated && auth.Handle != "" {
 		http.Redirect(w, r, "/"+url.PathEscape(auth.Handle)+"/", http.StatusSeeOther)
 		return
@@ -281,7 +297,11 @@ func (s *App) handleTenantIndex(
 		return
 	}
 
-	cats, err := s.service.ListCategories(service.ListCategoriesInput{AccountID: account.ID, Viewer: viewerFromAuth(auth)})
+	input := service.ListCategoriesInput{
+		AccountID: account.ID,
+		Viewer:    viewerFromAuth(auth),
+	}
+	cats, err := s.service.ListCategories(input)
 	if err != nil {
 		http.Error(w, "Failed to load categories", http.StatusInternalServerError)
 		return
@@ -323,12 +343,18 @@ func (s *App) accountForToken(
 	error,
 ) {
 	subject := accessToken.Subject()
-	account, err := s.service.GetAccountBySubject(service.GetAccountBySubjectInput{Subject: subject})
+	input := service.GetAccountBySubjectInput{
+		Subject: subject,
+	}
+	account, err := s.service.GetAccountBySubject(input)
 	if err == nil && !s.shouldRefreshProfile(account) {
 		return account, nil
 	}
 	if err != nil && !errors.Is(err, service.ErrNotFound) {
-		return nil, err
+		return nil, transientAccountSetupError(
+			"Compass could not read your account setup. This is probably temporary; try signing in again in a few minutes.",
+			err,
+		)
 	}
 
 	handle := subject
@@ -340,17 +366,55 @@ func (s *App) accountForToken(
 				log.Printf("failed to refresh consent profile for %s: %v", subject, fetchErr)
 				return account, nil
 			}
-			return nil, fetchErr
+			return nil, transientAccountSetupError(
+				"Compass could not reach Consent to finish setting up your account. Try signing in again in a few minutes.",
+				fetchErr,
+			)
 		}
-		if userInfo.Profile == nil || userInfo.Profile.Handle == "" {
-			return nil, errors.New("consent profile missing handle")
+		if userInfo == nil {
+			return nil, userActionAccountSetupError(
+				"Consent did not return profile information for this account. Try signing in again and make sure Compass can access your profile.",
+				errors.New("consent profile response missing user info"),
+			)
 		}
-		handle = userInfo.Profile.Handle
+		if userInfo.Sub != subject {
+			return nil, userActionAccountSetupError(
+				"Consent returned profile information for a different account. Sign in again with the Consent account you want to use for Compass.",
+				errors.New("consent profile subject mismatch"),
+			)
+		}
+		if userInfo.Profile == nil {
+			return nil, userActionAccountSetupError(
+				"Compass needs your Consent profile handle to create your account. Try signing in again and grant profile access.",
+				errors.New("consent profile missing handle"),
+			)
+		}
+		handle = strings.TrimSpace(userInfo.Profile.Handle)
+		if handle == "" {
+			return nil, userActionAccountSetupError(
+				"Your Consent profile does not have a usable handle yet. Add or update your handle in Consent, then sign in again.",
+				errors.New("consent profile missing handle"),
+			)
+		}
 	}
 
-	account, err = s.service.UpsertAccount(service.UpsertAccountInput{Subject: subject, Handle: handle, RefreshedAt: refreshedAt})
+	upsertInput := service.UpsertAccountInput{
+		Subject:     subject,
+		Handle:      handle,
+		RefreshedAt: refreshedAt,
+	}
+	account, err = s.service.UpsertAccount(upsertInput)
 	if err != nil {
-		return nil, err
+		if errors.Is(err, service.ErrAccountHandleConflict) {
+			return nil, userActionAccountSetupError(
+				"That Consent handle is already attached to another Compass account. Update your Consent handle or sign in with the account that owns it, then try again.",
+				err,
+			)
+		}
+		return nil, transientAccountSetupError(
+			"Compass could not save your account setup. This is probably temporary; try signing in again in a few minutes.",
+			err,
+		)
 	}
 	return account, nil
 }
@@ -376,9 +440,16 @@ func (s *App) resolveTenant(
 	bool,
 ) {
 	handle := r.PathValue("handle")
-	account, err := s.service.GetAccountByHandle(service.GetAccountByHandleInput{Handle: handle})
+	input := service.GetAccountByHandleInput{
+		Handle: handle,
+	}
+	account, err := s.service.GetAccountByHandle(input)
 	if err != nil {
-		http.Error(w, "Not found", http.StatusNotFound)
+		if errors.Is(err, service.ErrNotFound) {
+			s.renderUserNotFound(w, auth, handle)
+			return nil, auth, false
+		}
+		writeServiceError(w, err)
 		return nil, auth, false
 	}
 
@@ -430,7 +501,11 @@ func (s *App) handleCreateCategory(
 	}
 
 	ctx := parseRequestContext(r)
-	cat, err := s.service.CreateCategory(service.CreateCategoryInput{AccountID: account.ID, Name: "New Category"})
+	input := service.CreateCategoryInput{
+		AccountID: account.ID,
+		Name:      "New Category",
+	}
+	cat, err := s.service.CreateCategory(input)
 	if err != nil {
 		writeServiceError(w, err)
 		return
@@ -515,7 +590,12 @@ func (s *App) handleGetCategoryDetails(
 	ctx := parseRequestContext(r)
 	id := r.PathValue("id")
 
-	cat, err := s.service.GetCategoryWithWorkLogs(service.GetCategoryInput{AccountID: account.ID, ID: id, Viewer: viewerFromAuth(auth)})
+	input := service.GetCategoryInput{
+		AccountID: account.ID,
+		ID:        id,
+		Viewer:    viewerFromAuth(auth),
+	}
+	cat, err := s.service.GetCategoryWithWorkLogs(input)
 	if err != nil {
 		writeServiceError(w, err)
 		return
@@ -529,7 +609,11 @@ func (s *App) handleGetCategoryDetails(
 	}
 
 	// Deep Linking: Render full page with details open
-	cats, err := s.service.ListCategories(service.ListCategoriesInput{AccountID: account.ID, Viewer: viewerFromAuth(auth)})
+	listInput := service.ListCategoriesInput{
+		AccountID: account.ID,
+		Viewer:    viewerFromAuth(auth),
+	}
+	cats, err := s.service.ListCategories(listInput)
 	if err != nil {
 		http.Error(w, "Failed to load categories", http.StatusInternalServerError)
 		return
@@ -561,7 +645,12 @@ func (s *App) handleCreateProject(
 	ctx := parseRequestContext(r)
 	catID := r.PathValue("id")
 
-	project, err := s.service.CreateProject(service.CreateProjectInput{AccountID: account.ID, CategoryID: catID, Name: "New Project"})
+	input := service.CreateProjectInput{
+		AccountID:  account.ID,
+		CategoryID: catID,
+		Name:       "New Project",
+	}
+	project, err := s.service.CreateProject(input)
 	if err != nil {
 		writeServiceError(w, err)
 		return
@@ -573,7 +662,12 @@ func (s *App) handleCreateProject(
 	}
 
 	// Re-fetch category and render it as OOB
-	cat, err := s.service.GetCategory(service.GetCategoryInput{AccountID: account.ID, ID: catID, Viewer: service.OwnerViewer()})
+	getCategoryInput := service.GetCategoryInput{
+		AccountID: account.ID,
+		ID:        catID,
+		Viewer:    service.OwnerViewer(),
+	}
+	cat, err := s.service.GetCategory(getCategoryInput)
 	if err != nil {
 		writeServiceError(w, err)
 		return
@@ -645,7 +739,12 @@ func (s *App) handleUpdateProject(
 	}
 
 	// Re-fetch category and render it as OOB
-	cat, err := s.service.GetCategory(service.GetCategoryInput{AccountID: account.ID, ID: project.CategoryID, Viewer: service.OwnerViewer()})
+	getCategoryInput := service.GetCategoryInput{
+		AccountID: account.ID,
+		ID:        project.CategoryID,
+		Viewer:    service.OwnerViewer(),
+	}
+	cat, err := s.service.GetCategory(getCategoryInput)
 	if err != nil {
 		writeServiceError(w, err)
 		return
@@ -672,7 +771,12 @@ func (s *App) handleGetTaskDetails(
 	ctx := parseRequestContext(r)
 	id := r.PathValue("id")
 
-	task, err := s.service.GetTaskWithWorkLogs(service.GetTaskInput{AccountID: account.ID, ID: id, Viewer: viewerFromAuth(auth)})
+	input := service.GetTaskInput{
+		AccountID: account.ID,
+		ID:        id,
+		Viewer:    viewerFromAuth(auth),
+	}
+	task, err := s.service.GetTaskWithWorkLogs(input)
 	if err != nil {
 		writeServiceError(w, err)
 		return
@@ -688,7 +792,11 @@ func (s *App) handleGetTaskDetails(
 	}
 
 	// Deep Linking: Render full page with details open
-	cats, err := s.service.ListCategories(service.ListCategoriesInput{AccountID: account.ID, Viewer: viewerFromAuth(auth)})
+	listInput := service.ListCategoriesInput{
+		AccountID: account.ID,
+		Viewer:    viewerFromAuth(auth),
+	}
+	cats, err := s.service.ListCategories(listInput)
 	if err != nil {
 		http.Error(w, "Failed to load categories", http.StatusInternalServerError)
 		return
@@ -716,7 +824,12 @@ func (s *App) handleGetProjectDetails(
 	ctx := parseRequestContext(r)
 	id := r.PathValue("id")
 
-	project, err := s.service.GetProjectWithWorkLogs(service.GetProjectInput{AccountID: account.ID, ID: id, Viewer: viewerFromAuth(auth)})
+	input := service.GetProjectInput{
+		AccountID: account.ID,
+		ID:        id,
+		Viewer:    viewerFromAuth(auth),
+	}
+	project, err := s.service.GetProjectWithWorkLogs(input)
 	if err != nil {
 		writeServiceError(w, err)
 		return
@@ -732,7 +845,11 @@ func (s *App) handleGetProjectDetails(
 	}
 
 	// Deep Linking: Render full page with details open
-	cats, err := s.service.ListCategories(service.ListCategoriesInput{AccountID: account.ID, Viewer: viewerFromAuth(auth)})
+	listInput := service.ListCategoriesInput{
+		AccountID: account.ID,
+		Viewer:    viewerFromAuth(auth),
+	}
+	cats, err := s.service.ListCategories(listInput)
 	if err != nil {
 		http.Error(w, "Failed to load categories", http.StatusInternalServerError)
 		return
@@ -764,7 +881,12 @@ func (s *App) handleCreateTask(
 	ctx := parseRequestContext(r)
 	projectID := r.PathValue("id")
 
-	task, err := s.service.CreateTask(service.CreateTaskInput{AccountID: account.ID, ProjectID: projectID, Name: "New Task"})
+	input := service.CreateTaskInput{
+		AccountID: account.ID,
+		ProjectID: projectID,
+		Name:      "New Task",
+	}
+	task, err := s.service.CreateTask(input)
 	if err != nil {
 		writeServiceError(w, err)
 		return
@@ -776,7 +898,12 @@ func (s *App) handleCreateTask(
 	}
 
 	// Fetch parent category and render it as OOB
-	cat, err := s.service.GetCategory(service.GetCategoryInput{AccountID: account.ID, ID: task.CategoryID, Viewer: service.OwnerViewer()})
+	getCategoryInput := service.GetCategoryInput{
+		AccountID: account.ID,
+		ID:        task.CategoryID,
+		Viewer:    service.OwnerViewer(),
+	}
+	cat, err := s.service.GetCategory(getCategoryInput)
 	if err != nil {
 		writeServiceError(w, err)
 		return
@@ -847,7 +974,12 @@ func (s *App) handleUpdateTask(
 	}
 
 	// Fetch parent category and render it as OOB
-	cat, err := s.service.GetCategory(service.GetCategoryInput{AccountID: account.ID, ID: task.CategoryID, Viewer: service.OwnerViewer()})
+	getCategoryInput := service.GetCategoryInput{
+		AccountID: account.ID,
+		ID:        task.CategoryID,
+		Viewer:    service.OwnerViewer(),
+	}
+	cat, err := s.service.GetCategory(getCategoryInput)
 	if err != nil {
 		writeServiceError(w, err)
 		return
@@ -886,7 +1018,11 @@ func (s *App) handleReorderCategories(
 		return // Nothing to do
 	}
 
-	if err := s.service.ReorderCategories(service.ReorderCategoriesInput{AccountID: account.ID, IDs: ids}); err != nil {
+	input := service.ReorderCategoriesInput{
+		AccountID: account.ID,
+		IDs:       ids,
+	}
+	if err := s.service.ReorderCategories(input); err != nil {
 		writeServiceError(w, err)
 		return
 	}
@@ -923,7 +1059,12 @@ func (s *App) handleReorderProjects(
 		return // Nothing to do
 	}
 
-	if err := s.service.ReorderProjects(service.ReorderProjectsInput{AccountID: account.ID, CategoryID: catID, ProjectIDs: ids}); err != nil {
+	input := service.ReorderProjectsInput{
+		AccountID:  account.ID,
+		CategoryID: catID,
+		ProjectIDs: ids,
+	}
+	if err := s.service.ReorderProjects(input); err != nil {
 		writeServiceError(w, err)
 		return
 	}
@@ -957,7 +1098,12 @@ func (s *App) handleReorderTasks(
 	projectID := r.FormValue("project_id")
 	ids := r.Form["id"]
 
-	if err := s.service.ReorderTasks(service.ReorderTasksInput{AccountID: account.ID, ProjectID: projectID, TaskIDs: ids}); err != nil {
+	input := service.ReorderTasksInput{
+		AccountID: account.ID,
+		ProjectID: projectID,
+		TaskIDs:   ids,
+	}
+	if err := s.service.ReorderTasks(input); err != nil {
 		writeServiceError(w, err)
 		return
 	}
@@ -985,7 +1131,11 @@ func (s *App) handleDeleteCategory(
 	ctx := parseRequestContext(r)
 	id := r.PathValue("id")
 
-	if _, err := s.service.DeleteCategory(service.DeleteCategoryInput{AccountID: account.ID, ID: id}); err != nil {
+	input := service.DeleteCategoryInput{
+		AccountID: account.ID,
+		ID:        id,
+	}
+	if _, err := s.service.DeleteCategory(input); err != nil {
 		writeServiceError(w, err)
 		return
 	}
@@ -1016,7 +1166,11 @@ func (s *App) handleDeleteProject(
 	ctx := parseRequestContext(r)
 	id := r.PathValue("id")
 
-	project, err := s.service.DeleteProject(service.DeleteProjectInput{AccountID: account.ID, ID: id})
+	input := service.DeleteProjectInput{
+		AccountID: account.ID,
+		ID:        id,
+	}
+	project, err := s.service.DeleteProject(input)
 	if err != nil {
 		writeServiceError(w, err)
 		return
@@ -1028,7 +1182,12 @@ func (s *App) handleDeleteProject(
 	}
 
 	// Re-fetch category after deletion and render it as OOB
-	cat, err := s.service.GetCategory(service.GetCategoryInput{AccountID: account.ID, ID: project.CategoryID, Viewer: service.OwnerViewer()})
+	getCategoryInput := service.GetCategoryInput{
+		AccountID: account.ID,
+		ID:        project.CategoryID,
+		Viewer:    service.OwnerViewer(),
+	}
+	cat, err := s.service.GetCategory(getCategoryInput)
 	if err != nil {
 		writeServiceError(w, err)
 		return
@@ -1060,7 +1219,11 @@ func (s *App) handleDeleteTask(
 	ctx := parseRequestContext(r)
 	id := r.PathValue("id")
 
-	task, err := s.service.DeleteTask(service.DeleteTaskInput{AccountID: account.ID, ID: id})
+	input := service.DeleteTaskInput{
+		AccountID: account.ID,
+		ID:        id,
+	}
+	task, err := s.service.DeleteTask(input)
 	if err != nil {
 		writeServiceError(w, err)
 		return
@@ -1072,7 +1235,12 @@ func (s *App) handleDeleteTask(
 	}
 
 	// Re-fetch category after deletion and render it as OOB
-	cat, err := s.service.GetCategory(service.GetCategoryInput{AccountID: account.ID, ID: task.CategoryID, Viewer: service.OwnerViewer()})
+	getCategoryInput := service.GetCategoryInput{
+		AccountID: account.ID,
+		ID:        task.CategoryID,
+		Viewer:    service.OwnerViewer(),
+	}
+	cat, err := s.service.GetCategory(getCategoryInput)
 	if err != nil {
 		writeServiceError(w, err)
 		return
@@ -1153,7 +1321,12 @@ func (s *App) handleCreateProjectWorkLog(
 	}
 
 	// Re-fetch category and render as OOB
-	cat, err := s.service.GetCategory(service.GetCategoryInput{AccountID: account.ID, ID: workLog.CategoryID, Viewer: service.OwnerViewer()})
+	getCategoryInput := service.GetCategoryInput{
+		AccountID: account.ID,
+		ID:        workLog.CategoryID,
+		Viewer:    service.OwnerViewer(),
+	}
+	cat, err := s.service.GetCategory(getCategoryInput)
 	if err != nil {
 		writeServiceError(w, err)
 		return
@@ -1166,12 +1339,21 @@ func (s *App) handleCreateProjectWorkLog(
 	}
 
 	// Re-fetch project with work logs and render slideover OOB update
-	project, err := s.service.GetProject(service.GetProjectInput{AccountID: account.ID, ID: projectID, Viewer: service.OwnerViewer()})
+	getProjectInput := service.GetProjectInput{
+		AccountID: account.ID,
+		ID:        projectID,
+		Viewer:    service.OwnerViewer(),
+	}
+	project, err := s.service.GetProject(getProjectInput)
 	if err != nil {
 		writeServiceError(w, err)
 		return
 	}
-	projectWorkLogs, err := s.service.ListProjectWorkLogs(service.ListProjectWorkLogsInput{AccountID: account.ID, ProjectID: projectID})
+	listWorkLogsInput := service.ListProjectWorkLogsInput{
+		AccountID: account.ID,
+		ProjectID: projectID,
+	}
+	projectWorkLogs, err := s.service.ListProjectWorkLogs(listWorkLogsInput)
 	if err != nil {
 		writeServiceError(w, err)
 		return
@@ -1249,7 +1431,12 @@ func (s *App) handleCreateTaskWorkLog(
 	}
 
 	// Re-fetch category and render as OOB
-	cat, err := s.service.GetCategory(service.GetCategoryInput{AccountID: account.ID, ID: workLog.CategoryID, Viewer: service.OwnerViewer()})
+	getCategoryInput := service.GetCategoryInput{
+		AccountID: account.ID,
+		ID:        workLog.CategoryID,
+		Viewer:    service.OwnerViewer(),
+	}
+	cat, err := s.service.GetCategory(getCategoryInput)
 	if err != nil {
 		writeServiceError(w, err)
 		return
@@ -1262,12 +1449,21 @@ func (s *App) handleCreateTaskWorkLog(
 	}
 
 	// Re-fetch task with work logs and render slideover OOB update
-	task, err := s.service.GetTask(service.GetTaskInput{AccountID: account.ID, ID: taskID, Viewer: service.OwnerViewer()})
+	getTaskInput := service.GetTaskInput{
+		AccountID: account.ID,
+		ID:        taskID,
+		Viewer:    service.OwnerViewer(),
+	}
+	task, err := s.service.GetTask(getTaskInput)
 	if err != nil {
 		writeServiceError(w, err)
 		return
 	}
-	taskWorkLogs, err := s.service.ListTaskWorkLogs(service.ListTaskWorkLogsInput{AccountID: account.ID, TaskID: taskID})
+	listWorkLogsInput := service.ListTaskWorkLogsInput{
+		AccountID: account.ID,
+		TaskID:    taskID,
+	}
+	taskWorkLogs, err := s.service.ListTaskWorkLogs(listWorkLogsInput)
 	if err != nil {
 		writeServiceError(w, err)
 		return

@@ -2,10 +2,14 @@ package database
 
 import (
 	"database/sql"
+	"errors"
+	"strings"
 	"time"
 
 	"git.sr.ht/~jakintosh/compass/internal/service"
 	"github.com/google/uuid"
+	"modernc.org/sqlite"
+	sqlite3 "modernc.org/sqlite/lib"
 )
 
 func (db *DB) GetAccountByHandle(
@@ -47,7 +51,7 @@ func (db *DB) UpsertAccount(
 	id := uuid.NewString()
 	now := time.Now().Unix()
 	refreshed := refreshedAt.Unix()
-	return scanAccount(db.Conn.QueryRow(`
+	account, err := scanAccount(db.Conn.QueryRow(`
 		INSERT INTO accounts (id, consent_subject, handle, profile_refreshed_at, created_at, updated_at)
 		VALUES (?1, ?2, ?3, ?4, ?5, ?5)
 		ON CONFLICT(consent_subject) DO UPDATE SET
@@ -61,6 +65,26 @@ func (db *DB) UpsertAccount(
 		refreshed,
 		now,
 	))
+	if isAccountHandleConflict(err) {
+		return nil, service.ErrAccountHandleConflict
+	}
+	return account, err
+}
+
+func isAccountHandleConflict(
+	err error,
+) bool {
+	if err == nil {
+		return false
+	}
+
+	var sqliteErr *sqlite.Error
+	if !errors.As(err, &sqliteErr) || sqliteErr.Code() != sqlite3.SQLITE_CONSTRAINT_UNIQUE {
+		return false
+	}
+
+	message := strings.ToLower(err.Error())
+	return strings.Contains(message, "accounts.handle")
 }
 
 func scanAccount(

@@ -25,6 +25,17 @@ type PageView struct {
 	Categories    []CategoryView
 	ActiveDetails template.HTML // Pre-rendered details for deep linking
 	OOB           bool          // Always false for full page renders
+	Message       *MessageView
+}
+
+type MessageView struct {
+	Kicker         string
+	Title          string
+	Body           string
+	PrimaryURL     string
+	PrimaryLabel   string
+	SecondaryURL   string
+	SecondaryLabel string
 }
 
 type DeleteOOBView struct {
@@ -37,6 +48,18 @@ func (p *Renderer) RenderIndex(
 	auth AuthContext,
 ) error {
 	return p.RenderIndexWithDetails(w, categories, auth, nil)
+}
+
+func (p *Renderer) RenderMessagePage(
+	w io.Writer,
+	auth AuthContext,
+	message MessageView,
+) error {
+	pageView := PageView{
+		AuthContext: auth,
+		Message:     &message,
+	}
+	return p.tmpl.ExecuteTemplate(w, "layout.html", pageView)
 }
 
 func (p *Renderer) RenderIndexWithDetails(

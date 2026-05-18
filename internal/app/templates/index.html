@@ -1,7 +1,7 @@
 {{define "content"}}
 <div class="app">
     <header class="app-header">
-        <h1 class="app-title">In Progress</h1>
+        <h1 class="app-title">Compass</h1>
 
         <div class="header-actions">
             {{if .CanWrite}}
@@ -22,8 +22,29 @@
         </div>
     </header>
 
+    {{if .Message}}
+    <main class="message-page">
+        {{if .Message.Kicker}}<p class="message-kicker">{{.Message.Kicker}}</p>{{end}}
+        <h2 class="message-title">{{.Message.Title}}</h2>
+        <p class="message-body">{{.Message.Body}}</p>
+        <div class="message-actions">
+            {{if .Message.PrimaryURL}}<a class="btn btn-primary" href="{{.Message.PrimaryURL}}">{{.Message.PrimaryLabel}}</a>{{end}}
+            {{if .Message.SecondaryURL}}<a class="btn btn-link" href="{{.Message.SecondaryURL}}">{{.Message.SecondaryLabel}}</a>{{end}}
+        </div>
+    </main>
+    {{else if and (not .IsAuthenticated) (not .BasePath)}}
+    <main class="message-page message-page-home">
+        <p class="message-kicker">Project progress without the ceremony</p>
+        <h2 class="message-title">Track what is in progress.</h2>
+        <p class="message-body">Compass keeps categories, projects, tasks, and work logs in one quiet workspace.</p>
+        <div class="message-actions">
+            <a class="btn btn-primary" href="{{.LoginURL}}">Sign in with Consent</a>
+        </div>
+    </main>
+    {{else}}
     <ul id="categories-list" class="categories-list">
         {{range .Categories}} {{template "category.html" .}} {{end}}
     </ul>
+    {{end}}
 </div>
 {{end}}

@@ -241,6 +241,27 @@ body {
     color: var(--color-text);
 }
 
+.btn-primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 2.5rem;
+    padding: var(--space-sm) var(--space-md);
+    color: #ffffff;
+    background-color: var(--color-text);
+    border-radius: 4px;
+    text-decoration: none;
+    font-weight: 600;
+    transition:
+        background-color var(--transition-fast),
+        color var(--transition-fast);
+}
+
+.btn-primary:hover {
+    color: #ffffff;
+    background-color: var(--color-accent);
+}
+
 .btn-add {
     display: inline-flex;
     align-items: center;
@@ -291,6 +312,41 @@ body {
     display: flex;
     flex-direction: column;
     border-left: 1px solid var(--color-border);
+}
+
+.message-page {
+    max-width: 34rem;
+    padding-top: var(--space-2xl);
+}
+
+.message-page-home {
+    padding-top: 16vh;
+}
+
+.message-kicker {
+    margin-bottom: var(--space-sm);
+    color: var(--color-accent);
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+}
+
+.message-title {
+    margin-bottom: var(--space-md);
+    font-size: var(--font-size-2xl);
+    line-height: 1.15;
+}
+
+.message-body {
+    max-width: 30rem;
+    color: var(--color-text-muted);
+}
+
+.message-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    margin-top: var(--space-lg);
+    flex-wrap: wrap;
 }
 
 .projects-list,
