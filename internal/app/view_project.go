@@ -13,11 +13,13 @@ type ProjectView struct {
 	Name         string
 	Description  string
 	Completion   int
+	Confidence   string
 	Public       bool
 	ParentPublic bool // Whether parent category is public (for disabling toggle)
 	HasTasks     bool
 	Tasks        []TaskView
-	WorkLogs     []WorkLogView
+	ProjectLogs  []ProjectLogView
+	TaskLogs     []TaskLogView
 	OOB          bool
 	DeleteButton DeleteButtonView
 }
@@ -34,6 +36,7 @@ func NewProjectView(
 		Name:         t.Name,
 		Description:  t.Description,
 		Completion:   t.Completion,
+		Confidence:   t.Confidence,
 		Public:       t.Public,
 		ParentPublic: t.ParentPublic,
 		OOB:          oob,
@@ -46,7 +49,8 @@ func NewProjectView(
 		}
 	}
 
-	view.WorkLogs = NewWorkLogViewsFromProject(t)
+	view.ProjectLogs = NewProjectLogViewsFromProject(t)
+	view.TaskLogs = NewTaskLogViewsFromProject(t)
 
 	view.DeleteButton = DeleteButtonView{
 		URL:            auth.BasePath + "/projects/" + t.ID + "?csrf=" + auth.CSRFToken,

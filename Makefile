@@ -19,18 +19,18 @@ CONTAINER_PORT ?= 80
 .PHONY: help build generate test fmt vet lint install init run clean reset
 
 help:
-	printf "Targets:\n"
-	printf "  build    Build the Docker image $(IMAGE)\n"
-	printf "  generate Refresh generated source\n"
-	printf "  test     Run tests\n"
-	printf "  fmt      Format Go source\n"
-	printf "  vet      Run Go static analysis\n"
-	printf "  lint     Run formatting and static checks\n"
-	printf "  install  Install the CLI binary\n"
-	printf "  init     Create local runtime directories\n"
-	printf "  run      Run the Docker image in dev auth mode\n"
-	printf "  clean    Remove build and test artifacts\n"
-	printf "  reset    Remove local runtime state\n"
+	@printf "Targets:\n"
+	@printf "  build    Build the Docker image $(IMAGE)\n"
+	@printf "  generate Refresh generated source\n"
+	@printf "  test     Run tests\n"
+	@printf "  fmt      Format Go source\n"
+	@printf "  vet      Run Go static analysis\n"
+	@printf "  lint     Run formatting and static checks\n"
+	@printf "  install  Install the CLI binary\n"
+	@printf "  init     Create local runtime directories\n"
+	@printf "  run      Run the Docker image in dev auth mode\n"
+	@printf "  clean    Remove build and test artifacts\n"
+	@printf "  reset    Remove local runtime state\n"
 
 build: generate
 	$(DOCKER) build -t $(IMAGE) .

@@ -47,6 +47,7 @@ var migrations = []Migration{
 				description TEXT NOT NULL DEFAULT '',
 				status TEXT NOT NULL DEFAULT 'active',
 				completion INTEGER NOT NULL DEFAULT 0 CHECK (completion BETWEEN 0 AND 100),
+				confidence TEXT NOT NULL DEFAULT 'medium',
 				public INTEGER NOT NULL DEFAULT 1 CHECK (public IN (0, 1)),
 				sort_order INTEGER NOT NULL DEFAULT 0,
 				created_at INTEGER NOT NULL,
@@ -55,6 +56,7 @@ var migrations = []Migration{
 				deleted_at INTEGER,
 				UNIQUE(account_id, id),
 				CHECK (status IN ('active', 'archived', 'deleted')),
+				CHECK (confidence IN ('low', 'medium', 'high')),
 				FOREIGN KEY(account_id) REFERENCES accounts(id) ON DELETE CASCADE,
 				FOREIGN KEY(account_id, category_id) REFERENCES categories(account_id, id) ON DELETE CASCADE
 			);
@@ -79,24 +81,32 @@ var migrations = []Migration{
 				FOREIGN KEY(account_id, project_id) REFERENCES projects(account_id, id) ON DELETE CASCADE
 			);
 
-			CREATE TABLE work_logs (
+			CREATE TABLE task_log (
 				id TEXT PRIMARY KEY,
 				account_id TEXT NOT NULL,
-				project_id TEXT,
-				task_id TEXT,
+				task_id TEXT NOT NULL,
 				hours_worked REAL NOT NULL CHECK (hours_worked >= 0),
 				work_description TEXT NOT NULL,
 				completion_estimate INTEGER NOT NULL CHECK (completion_estimate BETWEEN 0 AND 100),
 				created_at INTEGER NOT NULL,
 				updated_at INTEGER,
 				deleted_at INTEGER,
-				CHECK (
-					(project_id IS NOT NULL AND task_id IS NULL) OR
-					(project_id IS NULL AND task_id IS NOT NULL)
-				),
 				FOREIGN KEY(account_id) REFERENCES accounts(id) ON DELETE CASCADE,
-				FOREIGN KEY(account_id, project_id) REFERENCES projects(account_id, id) ON DELETE CASCADE,
 				FOREIGN KEY(account_id, task_id) REFERENCES tasks(account_id, id) ON DELETE CASCADE
+			);
+
+			CREATE TABLE project_log (
+				id TEXT PRIMARY KEY,
+				account_id TEXT NOT NULL,
+				project_id TEXT NOT NULL,
+				status_estimate INTEGER NOT NULL CHECK (status_estimate BETWEEN 0 AND 100),
+				confidence TEXT NOT NULL CHECK (confidence IN ('low', 'medium', 'high')),
+				note TEXT NOT NULL DEFAULT '',
+				created_at INTEGER NOT NULL,
+				updated_at INTEGER,
+				deleted_at INTEGER,
+				FOREIGN KEY(account_id) REFERENCES accounts(id) ON DELETE CASCADE,
+				FOREIGN KEY(account_id, project_id) REFERENCES projects(account_id, id) ON DELETE CASCADE
 			);
 
 			CREATE TABLE entity_events (
@@ -108,7 +118,7 @@ var migrations = []Migration{
 				event_type TEXT NOT NULL,
 				occurred_at INTEGER NOT NULL,
 				data_json TEXT NOT NULL DEFAULT '{}',
-				CHECK (entity_type IN ('category', 'project', 'task', 'work_log')),
+				CHECK (entity_type IN ('category', 'project', 'task', 'task_log', 'project_log')),
 				CHECK (actor_account_id IS NULL OR actor_account_id = account_id),
 				FOREIGN KEY(account_id) REFERENCES accounts(id) ON DELETE CASCADE,
 				FOREIGN KEY(actor_account_id) REFERENCES accounts(id) ON DELETE SET NULL
@@ -119,10 +129,12 @@ var migrations = []Migration{
 			CREATE INDEX idx_projects_category ON projects(category_id);
 			CREATE INDEX idx_tasks_account ON tasks(account_id);
 			CREATE INDEX idx_tasks_project ON tasks(project_id);
-			CREATE INDEX idx_work_logs_account ON work_logs(account_id);
-			CREATE INDEX idx_work_logs_project ON work_logs(project_id);
-			CREATE INDEX idx_work_logs_task ON work_logs(task_id);
-			CREATE INDEX idx_work_logs_created_at ON work_logs(created_at DESC);
+			CREATE INDEX idx_task_log_account ON task_log(account_id);
+			CREATE INDEX idx_task_log_task ON task_log(task_id);
+			CREATE INDEX idx_task_log_created_at ON task_log(created_at DESC);
+			CREATE INDEX idx_project_log_account ON project_log(account_id);
+			CREATE INDEX idx_project_log_project ON project_log(project_id);
+			CREATE INDEX idx_project_log_created_at ON project_log(created_at DESC);
 			CREATE INDEX idx_entity_events_account ON entity_events(account_id);
 			CREATE INDEX idx_entity_events_entity ON entity_events(entity_type, entity_id);
 			CREATE INDEX idx_entity_events_occurred_at ON entity_events(occurred_at DESC);

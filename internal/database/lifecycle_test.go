@@ -173,8 +173,8 @@ func TestEntityEvents_AreInsertedForCoreMutations(t *testing.T) {
 	if _, err := db.RestoreTask(accountID, taskID); err != nil {
 		t.Fatalf("restore task: %v", err)
 	}
-	if _, err := db.AddWorkLogForTask(accountID, taskID, 1, "Task work", 50, nil); err != nil {
-		t.Fatalf("add work log: %v", err)
+	if _, err := db.AddTaskLog(accountID, taskID, 1, "Task work", 50, nil); err != nil {
+		t.Fatalf("add task log: %v", err)
 	}
 
 	for _, eventType := range []string{
@@ -182,7 +182,7 @@ func TestEntityEvents_AreInsertedForCoreMutations(t *testing.T) {
 		"project.created",
 		"task.created",
 		"task.status_changed",
-		"work_log.created",
+		"task_log.created",
 	} {
 		var count int
 		if err := db.Conn.QueryRow(`

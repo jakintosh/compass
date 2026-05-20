@@ -15,7 +15,7 @@ type TaskView struct {
 	Completion   int
 	Public       bool
 	ParentPublic bool // Whether parent project (and its category) is public
-	WorkLogs     []WorkLogView
+	TaskLogs     []TaskLogView
 	OOB          bool
 	DeleteButton DeleteButtonView
 }
@@ -34,7 +34,7 @@ func NewTaskView(
 		Completion:   s.Completion,
 		Public:       s.Public,
 		ParentPublic: s.ParentPublic,
-		WorkLogs:     NewWorkLogViewsFromTask(s),
+		TaskLogs:     NewTaskLogViewsFromTask(s),
 		OOB:          oob,
 		DeleteButton: DeleteButtonView{
 			URL:            auth.BasePath + "/tasks/" + s.ID + "?csrf=" + auth.CSRFToken,

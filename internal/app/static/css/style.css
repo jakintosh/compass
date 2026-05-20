@@ -780,7 +780,7 @@ body {
 }
 
 /* ==========================================
-   Work Log Styles
+   Log Styles
    ========================================== */
 .work-log-section {
     margin-top: var(--space-xl);
@@ -1023,7 +1023,7 @@ body {
     cursor: not-allowed;
 }
 
-/* Work Log Entries */
+/* Log Entries */
 .work-log-list {
     display: flex;
     flex-direction: column;

@@ -17,7 +17,7 @@ type Category struct {
 	ArchivedAt  *time.Time `json:"archived_at,omitempty"`
 	DeletedAt   *time.Time `json:"deleted_at,omitempty"`
 	Projects    []*Project `json:"projects"`
-	WorkLogs    []*WorkLog `json:"work_logs,omitempty"`
+	TaskLogs    []*TaskLog `json:"task_logs,omitempty"`
 }
 
 func (c *Category) AverageCompletion() int {
@@ -112,7 +112,7 @@ func (s *Service) GetCategory(
 	return cat, nil
 }
 
-func (s *Service) GetCategoryWithWorkLogs(
+func (s *Service) GetCategoryWithTaskLogs(
 	input GetCategoryInput,
 ) (
 	*Category,
@@ -128,11 +128,11 @@ func (s *Service) GetCategoryWithWorkLogs(
 		return nil, err
 	}
 
-	workLogs, err := s.store.GetWorkLogsForCategory(input.AccountID, input.ID)
+	taskLogs, err := s.store.GetTaskLogsForCategory(input.AccountID, input.ID)
 	if err != nil {
 		return nil, mapStoreError(err)
 	}
-	cat.WorkLogs = workLogs
+	cat.TaskLogs = taskLogs
 
 	return cat, nil
 }

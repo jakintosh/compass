@@ -20,7 +20,7 @@ type Task struct {
 	UpdatedAt    time.Time  `json:"updated_at"`
 	ArchivedAt   *time.Time `json:"archived_at,omitempty"`
 	DeletedAt    *time.Time `json:"deleted_at,omitempty"`
-	WorkLogs     []*WorkLog `json:"work_logs,omitempty"`
+	TaskLogs     []*TaskLog `json:"task_logs,omitempty"`
 }
 
 type GetTaskInput struct {
@@ -65,7 +65,7 @@ func (s *Service) GetTask(
 	return task, nil
 }
 
-func (s *Service) GetTaskWithWorkLogs(
+func (s *Service) GetTaskWithLogs(
 	input GetTaskInput,
 ) (
 	*Task,
@@ -81,11 +81,11 @@ func (s *Service) GetTaskWithWorkLogs(
 		return nil, err
 	}
 
-	workLogs, err := s.store.GetWorkLogsForTask(input.AccountID, input.ID)
+	taskLogs, err := s.store.GetTaskLogsForTask(input.AccountID, input.ID)
 	if err != nil {
 		return nil, mapStoreError(err)
 	}
-	task.WorkLogs = workLogs
+	task.TaskLogs = taskLogs
 
 	return task, nil
 }

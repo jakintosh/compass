@@ -12,7 +12,8 @@ type fakeStore struct {
 	category   *Category
 	project    *Project
 	task       *Task
-	workLog    *WorkLog
+	taskLog    *TaskLog
+	projectLog *ProjectLog
 	err        error
 
 	lastAccountID        string
@@ -198,27 +199,31 @@ func (f *fakeStore) ReorderTasks(accountID string, projectID string, taskIDs []s
 	return f.err
 }
 
-func (f *fakeStore) AddWorkLogForProject(accountID string, projectID string, hoursWorked float64, workDescription string, completionEstimate int, customTime *time.Time) (*WorkLog, error) {
-	f.lastAccountID = accountID
-	f.lastProjectID = projectID
-	return &WorkLog{ID: "work-log-1", ProjectID: projectID, HoursWorked: hoursWorked, WorkDescription: workDescription, CompletionEstimate: completionEstimate}, f.err
-}
-
-func (f *fakeStore) AddWorkLogForTask(accountID string, taskID string, hoursWorked float64, workDescription string, completionEstimate int, customTime *time.Time) (*WorkLog, error) {
+func (f *fakeStore) AddTaskLog(accountID string, taskID string, hoursWorked float64, workDescription string, completionEstimate int, customTime *time.Time) (*TaskLog, error) {
 	f.lastAccountID = accountID
 	f.lastTaskID = taskID
-	return &WorkLog{ID: "work-log-1", TaskID: taskID, HoursWorked: hoursWorked, WorkDescription: workDescription, CompletionEstimate: completionEstimate}, f.err
+	return &TaskLog{ID: "task-log-1", TaskID: taskID, HoursWorked: hoursWorked, WorkDescription: workDescription, CompletionEstimate: completionEstimate}, f.err
 }
 
-func (f *fakeStore) GetWorkLogsForTask(accountID string, taskID string) ([]*WorkLog, error) {
+func (f *fakeStore) AddProjectLog(accountID string, projectID string, statusEstimate int, confidence string, note string, customTime *time.Time) (*ProjectLog, error) {
+	f.lastAccountID = accountID
+	f.lastProjectID = projectID
+	return &ProjectLog{ID: "project-log-1", ProjectID: projectID, StatusEstimate: statusEstimate, Confidence: confidence, Note: note}, f.err
+}
+
+func (f *fakeStore) GetTaskLogsForTask(accountID string, taskID string) ([]*TaskLog, error) {
 	return nil, f.err
 }
 
-func (f *fakeStore) GetWorkLogsForProject(accountID string, projectID string) ([]*WorkLog, error) {
+func (f *fakeStore) GetTaskLogsForProject(accountID string, projectID string) ([]*TaskLog, error) {
 	return nil, f.err
 }
 
-func (f *fakeStore) GetWorkLogsForCategory(accountID string, categoryID string) ([]*WorkLog, error) {
+func (f *fakeStore) GetTaskLogsForCategory(accountID string, categoryID string) ([]*TaskLog, error) {
+	return nil, f.err
+}
+
+func (f *fakeStore) GetProjectLogsForProject(accountID string, projectID string) ([]*ProjectLog, error) {
 	return nil, f.err
 }
 
@@ -337,26 +342,38 @@ func TestService_MapsNotActiveStoreErrorsToInvalidInput(t *testing.T) {
 	}
 }
 
-func TestService_ValidatesWorkLogInputs(t *testing.T) {
+func TestService_ValidatesLogInputs(t *testing.T) {
 	svc := newTestService(t, &fakeStore{})
 
-	if _, err := svc.AddProjectWorkLog(AddProjectWorkLogInput{AccountID: "account-1", ProjectID: "project-1", HoursWorked: -1, CompletionEstimate: 50}); !errors.Is(err, ErrInvalidInput) {
-		t.Fatalf("AddProjectWorkLog negative hours error = %v, want ErrInvalidInput", err)
+	if _, err := svc.AddTaskLog(AddTaskLogInput{AccountID: "account-1", TaskID: "task-1", HoursWorked: -1, CompletionEstimate: 50}); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("AddTaskLog negative hours error = %v, want ErrInvalidInput", err)
 	}
-	if _, err := svc.AddTaskWorkLog(AddTaskWorkLogInput{AccountID: "account-1", TaskID: "task-1", HoursWorked: 1, CompletionEstimate: 101}); !errors.Is(err, ErrInvalidInput) {
-		t.Fatalf("AddTaskWorkLog invalid completion error = %v, want ErrInvalidInput", err)
+	if _, err := svc.AddTaskLog(AddTaskLogInput{AccountID: "account-1", TaskID: "task-1", HoursWorked: 1, CompletionEstimate: 101}); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("AddTaskLog invalid completion error = %v, want ErrInvalidInput", err)
 	}
-	if _, err := svc.AddTaskWorkLog(AddTaskWorkLogInput{AccountID: "account-1", TaskID: "", HoursWorked: 1, CompletionEstimate: 50}); !errors.Is(err, ErrInvalidInput) {
-		t.Fatalf("AddTaskWorkLog missing task error = %v, want ErrInvalidInput", err)
+	if _, err := svc.AddTaskLog(AddTaskLogInput{AccountID: "account-1", TaskID: "", HoursWorked: 1, CompletionEstimate: 50}); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("AddTaskLog missing task error = %v, want ErrInvalidInput", err)
+	}
+	if _, err := svc.AddProjectLog(AddProjectLogInput{AccountID: "account-1", ProjectID: "project-1", StatusEstimate: 50, Confidence: "unknown"}); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("AddProjectLog invalid confidence error = %v, want ErrInvalidInput", err)
+	}
+	if _, err := svc.AddProjectLog(AddProjectLogInput{AccountID: "account-1", ProjectID: "project-1", StatusEstimate: 101, Confidence: "medium"}); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("AddProjectLog invalid status estimate error = %v, want ErrInvalidInput", err)
 	}
 
 	store := &fakeStore{}
 	svc = newTestService(t, store)
-	if _, err := svc.AddProjectWorkLog(AddProjectWorkLogInput{AccountID: " account-1 ", ProjectID: " project-1 ", HoursWorked: 1, WorkDescription: " work ", CompletionEstimate: 50}); err != nil {
-		t.Fatalf("AddProjectWorkLog valid input returned error: %v", err)
+	if _, err := svc.AddTaskLog(AddTaskLogInput{AccountID: " account-1 ", TaskID: " task-1 ", HoursWorked: 1, WorkDescription: " work ", CompletionEstimate: 50}); err != nil {
+		t.Fatalf("AddTaskLog valid input returned error: %v", err)
+	}
+	if store.lastAccountID != "account-1" || store.lastTaskID != "task-1" {
+		t.Fatalf("task log store call = %#v", store)
+	}
+	if _, err := svc.AddProjectLog(AddProjectLogInput{AccountID: " account-1 ", ProjectID: " project-1 ", StatusEstimate: 50, Confidence: " MEDIUM ", Note: " note "}); err != nil {
+		t.Fatalf("AddProjectLog valid input returned error: %v", err)
 	}
 	if store.lastAccountID != "account-1" || store.lastProjectID != "project-1" {
-		t.Fatalf("work log store call = %#v", store)
+		t.Fatalf("project log store call = %#v", store)
 	}
 }
 

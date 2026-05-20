@@ -32,9 +32,9 @@
         </form>
 
         <div class="work-log-section">
-            <h3 class="section-title">Work Log</h3>
+            <h3 class="section-title">Task Work Log</h3>
 
-            <form class="work-log-form" hx-post="{{.BasePath}}/tasks/{{.ID}}/work-logs?csrf={{.CSRFToken}}" hx-swap="none" _="
+            <form class="work-log-form" hx-post="{{.BasePath}}/tasks/{{.ID}}/logs?csrf={{.CSRFToken}}" hx-swap="none" _="
                     on htmx:afterRequest
                         reset() me
                         remove .open from .form-expandable in me
@@ -82,8 +82,8 @@
             </form>
 
             <div class="work-log-list">
-                {{range .WorkLogs}}
-                {{template "work_log_entry" .}}
+                {{range .TaskLogs}}
+                {{template "task_log_entry" .}}
                 {{end}}
             </div>
         </div>
@@ -104,10 +104,10 @@
         </div>
 
         <div class="work-log-section">
-            <h3 class="section-title">Work Log</h3>
+            <h3 class="section-title">Task Work Log</h3>
             <div class="work-log-list">
-                {{range .WorkLogs}}
-                {{template "work_log_entry" .}}
+                {{range .TaskLogs}}
+                {{template "task_log_entry" .}}
                 {{end}}
             </div>
         </div>

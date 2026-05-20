@@ -12,7 +12,7 @@ Every project and task is a slider ranging from 0% to 100%. This lets you track 
 - **Projects**: Larger efforts or outcomes you're working toward
 - **Tasks**: Concrete pieces of work inside a project
 
-Projects can contain tasks, and both levels can carry their own progress and work log history.
+Projects can contain tasks. Tasks carry work logs with hours and task completion estimates, while projects carry check-ins with status estimates and confidence.
 
 ### Flexible Management
 - **Reorder anything**: Drag and drop categories, projects, and tasks to organize them however you like

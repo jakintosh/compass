@@ -7,20 +7,22 @@ import (
 )
 
 type Project struct {
-	ID           string     `json:"id"`
-	CategoryID   string     `json:"category_id"`
-	Name         string     `json:"name"`
-	Description  string     `json:"description"`
-	Status       string     `json:"status"`
-	Completion   int        `json:"completion"`
-	Public       bool       `json:"public"`
-	ParentPublic bool       `json:"parent_public"`
-	CreatedAt    time.Time  `json:"created_at"`
-	UpdatedAt    time.Time  `json:"updated_at"`
-	ArchivedAt   *time.Time `json:"archived_at,omitempty"`
-	DeletedAt    *time.Time `json:"deleted_at,omitempty"`
-	Tasks        []*Task    `json:"tasks"`
-	WorkLogs     []*WorkLog `json:"work_logs,omitempty"`
+	ID           string        `json:"id"`
+	CategoryID   string        `json:"category_id"`
+	Name         string        `json:"name"`
+	Description  string        `json:"description"`
+	Status       string        `json:"status"`
+	Completion   int           `json:"completion"`
+	Confidence   string        `json:"confidence"`
+	Public       bool          `json:"public"`
+	ParentPublic bool          `json:"parent_public"`
+	CreatedAt    time.Time     `json:"created_at"`
+	UpdatedAt    time.Time     `json:"updated_at"`
+	ArchivedAt   *time.Time    `json:"archived_at,omitempty"`
+	DeletedAt    *time.Time    `json:"deleted_at,omitempty"`
+	Tasks        []*Task       `json:"tasks"`
+	ProjectLogs  []*ProjectLog `json:"project_logs,omitempty"`
+	TaskLogs     []*TaskLog    `json:"task_logs,omitempty"`
 }
 
 type GetProjectInput struct {
@@ -65,7 +67,7 @@ func (s *Service) GetProject(
 	return project, nil
 }
 
-func (s *Service) GetProjectWithWorkLogs(
+func (s *Service) GetProjectWithLogs(
 	input GetProjectInput,
 ) (
 	*Project,
@@ -81,11 +83,17 @@ func (s *Service) GetProjectWithWorkLogs(
 		return nil, err
 	}
 
-	workLogs, err := s.store.GetWorkLogsForProject(input.AccountID, input.ID)
+	projectLogs, err := s.store.GetProjectLogsForProject(input.AccountID, input.ID)
 	if err != nil {
 		return nil, mapStoreError(err)
 	}
-	project.WorkLogs = workLogs
+	project.ProjectLogs = projectLogs
+
+	taskLogs, err := s.store.GetTaskLogsForProject(input.AccountID, input.ID)
+	if err != nil {
+		return nil, mapStoreError(err)
+	}
+	project.TaskLogs = taskLogs
 
 	return project, nil
 }

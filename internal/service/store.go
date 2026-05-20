@@ -34,9 +34,10 @@ type Store interface {
 	RestoreTask(accountID string, id string) (*Task, error)
 	ReorderTasks(accountID string, projectID string, taskIDs []string) error
 
-	AddWorkLogForProject(accountID string, projectID string, hoursWorked float64, workDescription string, completionEstimate int, customTime *time.Time) (*WorkLog, error)
-	AddWorkLogForTask(accountID string, taskID string, hoursWorked float64, workDescription string, completionEstimate int, customTime *time.Time) (*WorkLog, error)
-	GetWorkLogsForTask(accountID string, taskID string) ([]*WorkLog, error)
-	GetWorkLogsForProject(accountID string, projectID string) ([]*WorkLog, error)
-	GetWorkLogsForCategory(accountID string, categoryID string) ([]*WorkLog, error)
+	AddTaskLog(accountID string, taskID string, hoursWorked float64, workDescription string, completionEstimate int, customTime *time.Time) (*TaskLog, error)
+	AddProjectLog(accountID string, projectID string, statusEstimate int, confidence string, note string, customTime *time.Time) (*ProjectLog, error)
+	GetTaskLogsForTask(accountID string, taskID string) ([]*TaskLog, error)
+	GetTaskLogsForProject(accountID string, projectID string) ([]*TaskLog, error)
+	GetTaskLogsForCategory(accountID string, categoryID string) ([]*TaskLog, error)
+	GetProjectLogsForProject(accountID string, projectID string) ([]*ProjectLog, error)
 }

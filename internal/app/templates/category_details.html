@@ -30,10 +30,10 @@
         </form>
 
         <div class="work-log-section">
-            <h3 class="section-title">All Work Logs</h3>
+            <h3 class="section-title">All Task Work</h3>
             <div class="work-log-list">
-                {{range .WorkLogs}}
-                {{template "work_log_entry" .}}
+                {{range .TaskLogs}}
+                {{template "task_log_entry" .}}
                 {{end}}
             </div>
         </div>
@@ -54,10 +54,10 @@
         </div>
 
         <div class="work-log-section">
-            <h3 class="section-title">All Work Logs</h3>
+            <h3 class="section-title">All Task Work</h3>
             <div class="work-log-list">
-                {{range .WorkLogs}}
-                {{template "work_log_entry" .}}
+                {{range .TaskLogs}}
+                {{template "task_log_entry" .}}
                 {{end}}
             </div>
         </div>

@@ -22,7 +22,8 @@ func TestMigrations_CreateRequiredTables(t *testing.T) {
 		"categories",
 		"projects",
 		"tasks",
-		"work_logs",
+		"task_log",
+		"project_log",
 		"entity_events",
 	} {
 		var count int
@@ -49,10 +50,12 @@ func TestMigrations_CreateRequiredIndexes(t *testing.T) {
 		"idx_projects_category",
 		"idx_tasks_account",
 		"idx_tasks_project",
-		"idx_work_logs_account",
-		"idx_work_logs_project",
-		"idx_work_logs_task",
-		"idx_work_logs_created_at",
+		"idx_task_log_account",
+		"idx_task_log_task",
+		"idx_task_log_created_at",
+		"idx_project_log_account",
+		"idx_project_log_project",
+		"idx_project_log_created_at",
 		"idx_entity_events_account",
 		"idx_entity_events_entity",
 		"idx_entity_events_occurred_at",
@@ -120,33 +123,33 @@ func TestMigrations_RejectInvalidDomainValues(t *testing.T) {
 			args: []any{accountID, projectID},
 		},
 		{
-			name: "negative work hours",
+			name: "negative task work hours",
 			sql: `
-				INSERT INTO work_logs (
+				INSERT INTO task_log (
 					id,
 					account_id,
-					project_id,
+					task_id,
 					hours_worked,
 					work_description,
 					completion_estimate,
 					created_at
 				)
 				VALUES ('log-invalid-hours', ?1, ?2, -1, '', 10, 1)`,
-			args: []any{accountID, projectID},
+			args: []any{accountID, seedTask(t, db, accountID, projectID, "Task")},
 		},
 		{
-			name: "invalid work log parent shape",
+			name: "invalid project log confidence",
 			sql: `
-				INSERT INTO work_logs (
+				INSERT INTO project_log (
 					id,
 					account_id,
-					hours_worked,
-					work_description,
-					completion_estimate,
+					project_id,
+					status_estimate,
+					confidence,
 					created_at
 				)
-				VALUES ('log-missing-parent', ?1, 1, '', 10, 1)`,
-			args: []any{accountID},
+				VALUES ('log-invalid-confidence', ?1, ?2, 10, 'unknown', 1)`,
+			args: []any{accountID, projectID},
 		},
 	}
 
@@ -202,24 +205,23 @@ func TestMigrations_CompositeForeignKeysPreventAccountDrift(t *testing.T) {
 	}
 
 	if _, err := db.Conn.Exec(`
-		INSERT INTO work_logs (
+		INSERT INTO project_log (
 			id,
 			account_id,
 			project_id,
-			hours_worked,
-			work_description,
-			completion_estimate,
+			status_estimate,
+			confidence,
 			created_at
 		)
-		VALUES ('cross-account-project-log', ?1, ?2, 1, '', 10, 1)`,
+		VALUES ('cross-account-project-log', ?1, ?2, 10, 'medium', 1)`,
 		aliceID,
 		bobProjectID,
 	); err == nil {
-		t.Fatal("cross-account project work log insert succeeded; want foreign key error")
+		t.Fatal("cross-account project log insert succeeded; want foreign key error")
 	}
 
 	if _, err := db.Conn.Exec(`
-		INSERT INTO work_logs (
+		INSERT INTO task_log (
 			id,
 			account_id,
 			task_id,
@@ -232,7 +234,7 @@ func TestMigrations_CompositeForeignKeysPreventAccountDrift(t *testing.T) {
 		aliceID,
 		bobTaskID,
 	); err == nil {
-		t.Fatal("cross-account task work log insert succeeded; want foreign key error")
+		t.Fatal("cross-account task log insert succeeded; want foreign key error")
 	}
 
 	if _, err := db.Conn.Exec(`

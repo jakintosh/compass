@@ -15,7 +15,7 @@ type CategoryView struct {
 	Public            bool
 	AverageCompletion int
 	Projects          []ProjectView
-	WorkLogs          []WorkLogView
+	TaskLogs          []TaskLogView
 	OOB               bool
 	DeleteButton      DeleteButtonView
 }
@@ -34,7 +34,7 @@ func NewCategoryView(
 		Public:            c.Public,
 		AverageCompletion: c.AverageCompletion(),
 		OOB:               oob,
-		WorkLogs:          NewWorkLogViewsFromCategory(c),
+		TaskLogs:          NewTaskLogViewsFromCategory(c),
 	}
 	if len(c.Projects) > 0 {
 		view.Projects = make([]ProjectView, len(c.Projects))

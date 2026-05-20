@@ -127,7 +127,7 @@ func (s *App) buildProjectRouter() http.Handler {
 	mux.HandleFunc("DELETE /{id}", s.handleDeleteProject)
 	mux.HandleFunc("GET /{id}/details", s.handleGetProjectDetails)
 	mux.HandleFunc("POST /{id}/tasks", s.handleCreateTask)
-	mux.HandleFunc("POST /{id}/work-logs", s.handleCreateProjectWorkLog)
+	mux.HandleFunc("POST /{id}/logs", s.handleCreateProjectLog)
 
 	return mux
 }
@@ -139,7 +139,7 @@ func (s *App) buildTaskRouter() http.Handler {
 	mux.HandleFunc("PATCH /{id}", s.handleUpdateTask)
 	mux.HandleFunc("DELETE /{id}", s.handleDeleteTask)
 	mux.HandleFunc("GET /{id}/details", s.handleGetTaskDetails)
-	mux.HandleFunc("POST /{id}/work-logs", s.handleCreateTaskWorkLog)
+	mux.HandleFunc("POST /{id}/logs", s.handleCreateTaskLog)
 
 	return mux
 }
@@ -595,7 +595,7 @@ func (s *App) handleGetCategoryDetails(
 		ID:        id,
 		Viewer:    viewerFromAuth(auth),
 	}
-	cat, err := s.service.GetCategoryWithWorkLogs(input)
+	cat, err := s.service.GetCategoryWithTaskLogs(input)
 	if err != nil {
 		writeServiceError(w, err)
 		return
@@ -776,7 +776,7 @@ func (s *App) handleGetTaskDetails(
 		ID:        id,
 		Viewer:    viewerFromAuth(auth),
 	}
-	task, err := s.service.GetTaskWithWorkLogs(input)
+	task, err := s.service.GetTaskWithLogs(input)
 	if err != nil {
 		writeServiceError(w, err)
 		return
@@ -829,7 +829,7 @@ func (s *App) handleGetProjectDetails(
 		ID:        id,
 		Viewer:    viewerFromAuth(auth),
 	}
-	project, err := s.service.GetProjectWithWorkLogs(input)
+	project, err := s.service.GetProjectWithLogs(input)
 	if err != nil {
 		writeServiceError(w, err)
 		return
@@ -1256,7 +1256,7 @@ func (s *App) handleDeleteTask(
 	w.Write(buf.Bytes())
 }
 
-func (s *App) handleCreateProjectWorkLog(
+func (s *App) handleCreateProjectLog(
 	w http.ResponseWriter,
 	r *http.Request,
 ) {
@@ -1277,19 +1277,14 @@ func (s *App) handleCreateProjectWorkLog(
 		return
 	}
 
-	hoursWorked, err := strconv.ParseFloat(r.FormValue("hours_worked"), 64)
+	statusEstimate, err := strconv.Atoi(r.FormValue("status_estimate"))
 	if err != nil {
-		http.Error(w, "Invalid hours_worked value", http.StatusBadRequest)
+		http.Error(w, "Invalid status_estimate value", http.StatusBadRequest)
 		return
 	}
 
-	completionEstimate, err := strconv.Atoi(r.FormValue("completion_estimate"))
-	if err != nil {
-		http.Error(w, "Invalid completion_estimate value", http.StatusBadRequest)
-		return
-	}
-
-	workDescription := r.FormValue("work_description")
+	confidence := r.FormValue("confidence")
+	note := r.FormValue("note")
 
 	// Parse optional custom timestamp
 	var customTime *time.Time
@@ -1301,15 +1296,15 @@ func (s *App) handleCreateProjectWorkLog(
 		}
 	}
 
-	workLogInput := service.AddProjectWorkLogInput{
-		AccountID:          account.ID,
-		ProjectID:          projectID,
-		HoursWorked:        hoursWorked,
-		WorkDescription:    workDescription,
-		CompletionEstimate: completionEstimate,
-		CreatedAt:          customTime,
+	projectLogInput := service.AddProjectLogInput{
+		AccountID:      account.ID,
+		ProjectID:      projectID,
+		StatusEstimate: statusEstimate,
+		Confidence:     confidence,
+		Note:           note,
+		CreatedAt:      customTime,
 	}
-	workLog, err := s.service.AddProjectWorkLog(workLogInput)
+	projectLog, err := s.service.AddProjectLog(projectLogInput)
 	if err != nil {
 		writeServiceError(w, err)
 		return
@@ -1323,7 +1318,7 @@ func (s *App) handleCreateProjectWorkLog(
 	// Re-fetch category and render as OOB
 	getCategoryInput := service.GetCategoryInput{
 		AccountID: account.ID,
-		ID:        workLog.CategoryID,
+		ID:        projectLog.CategoryID,
 		Viewer:    service.OwnerViewer(),
 	}
 	cat, err := s.service.GetCategory(getCategoryInput)
@@ -1338,7 +1333,7 @@ func (s *App) handleCreateProjectWorkLog(
 		return
 	}
 
-	// Re-fetch project with work logs and render slideover OOB update
+	// Re-fetch project logs and task activity, then render the slideover OOB update.
 	getProjectInput := service.GetProjectInput{
 		AccountID: account.ID,
 		ID:        projectID,
@@ -1349,16 +1344,26 @@ func (s *App) handleCreateProjectWorkLog(
 		writeServiceError(w, err)
 		return
 	}
-	listWorkLogsInput := service.ListProjectWorkLogsInput{
+	listProjectLogsInput := service.ListProjectLogsInput{
 		AccountID: account.ID,
 		ProjectID: projectID,
 	}
-	projectWorkLogs, err := s.service.ListProjectWorkLogs(listWorkLogsInput)
+	projectLogs, err := s.service.ListProjectLogs(listProjectLogsInput)
 	if err != nil {
 		writeServiceError(w, err)
 		return
 	}
-	project.WorkLogs = projectWorkLogs
+	project.ProjectLogs = projectLogs
+	listTaskLogsInput := service.ListProjectTaskLogsInput{
+		AccountID: account.ID,
+		ProjectID: projectID,
+	}
+	taskLogs, err := s.service.ListProjectTaskLogs(listTaskLogsInput)
+	if err != nil {
+		writeServiceError(w, err)
+		return
+	}
+	project.TaskLogs = taskLogs
 
 	projectView := NewProjectView(project, false, auth)
 	if err := s.renderer.RenderSlideoverWithDetails(w, projectView); err != nil {
@@ -1366,7 +1371,7 @@ func (s *App) handleCreateProjectWorkLog(
 	}
 }
 
-func (s *App) handleCreateTaskWorkLog(
+func (s *App) handleCreateTaskLog(
 	w http.ResponseWriter,
 	r *http.Request,
 ) {
@@ -1411,7 +1416,7 @@ func (s *App) handleCreateTaskWorkLog(
 		}
 	}
 
-	workLogInput := service.AddTaskWorkLogInput{
+	taskLogInput := service.AddTaskLogInput{
 		AccountID:          account.ID,
 		TaskID:             taskID,
 		HoursWorked:        hoursWorked,
@@ -1419,7 +1424,7 @@ func (s *App) handleCreateTaskWorkLog(
 		CompletionEstimate: completionEstimate,
 		CreatedAt:          customTime,
 	}
-	workLog, err := s.service.AddTaskWorkLog(workLogInput)
+	taskLog, err := s.service.AddTaskLog(taskLogInput)
 	if err != nil {
 		writeServiceError(w, err)
 		return
@@ -1433,7 +1438,7 @@ func (s *App) handleCreateTaskWorkLog(
 	// Re-fetch category and render as OOB
 	getCategoryInput := service.GetCategoryInput{
 		AccountID: account.ID,
-		ID:        workLog.CategoryID,
+		ID:        taskLog.CategoryID,
 		Viewer:    service.OwnerViewer(),
 	}
 	cat, err := s.service.GetCategory(getCategoryInput)
@@ -1448,7 +1453,7 @@ func (s *App) handleCreateTaskWorkLog(
 		return
 	}
 
-	// Re-fetch task with work logs and render slideover OOB update
+	// Re-fetch task logs and render the slideover OOB update.
 	getTaskInput := service.GetTaskInput{
 		AccountID: account.ID,
 		ID:        taskID,
@@ -1459,16 +1464,16 @@ func (s *App) handleCreateTaskWorkLog(
 		writeServiceError(w, err)
 		return
 	}
-	listWorkLogsInput := service.ListTaskWorkLogsInput{
+	listTaskLogsInput := service.ListTaskLogsInput{
 		AccountID: account.ID,
 		TaskID:    taskID,
 	}
-	taskWorkLogs, err := s.service.ListTaskWorkLogs(listWorkLogsInput)
+	taskLogs, err := s.service.ListTaskLogs(listTaskLogsInput)
 	if err != nil {
 		writeServiceError(w, err)
 		return
 	}
-	task.WorkLogs = taskWorkLogs
+	task.TaskLogs = taskLogs
 
 	taskView := NewTaskView(task, false, auth)
 	if err := s.renderer.RenderSlideoverWithDetails(w, taskView); err != nil {

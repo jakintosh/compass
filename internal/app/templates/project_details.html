@@ -32,9 +32,9 @@
         </form>
 
         <div class="work-log-section">
-            <h3 class="section-title">Work Log</h3>
+            <h3 class="section-title">Project Check-In</h3>
 
-            <form class="work-log-form" hx-post="{{.BasePath}}/projects/{{.ID}}/work-logs?csrf={{.CSRFToken}}" hx-swap="none" _="
+            <form class="work-log-form" hx-post="{{.BasePath}}/projects/{{.ID}}/logs?csrf={{.CSRFToken}}" hx-swap="none" _="
                     on htmx:afterRequest
                         reset() me
                         remove .open from .form-expandable in me
@@ -42,20 +42,24 @@
                 ">
                 <div class="form-row-inline">
                     <div class="form-field-compact">
-                        <label class="field-label">Completion</label>
+                        <label class="field-label">Status Estimate</label>
                         <div class="slider-compact">
-                            <input type="range" min="0" max="100" value="{{.Completion}}" name="completion_estimate" class="range-slider range-slider-compact" oninput="this.nextElementSibling.textContent = this.value + '%'">
+                            <input type="range" min="0" max="100" value="{{.Completion}}" name="status_estimate" class="range-slider range-slider-compact" oninput="this.nextElementSibling.textContent = this.value + '%'">
                             <span class="percent-display-compact">{{.Completion}}%</span>
                         </div>
                     </div>
                     <div class="form-field-compact">
-                        <label class="field-label">Hours</label>
-                        <input type="number" step="0.5" min="0" name="hours_worked" class="input-box field-input-compact" placeholder="0" required>
+                        <label class="field-label">Confidence</label>
+                        <select name="confidence" class="input-box field-input-compact" required>
+                            <option value="low" {{if eq .Confidence "low"}}selected{{end}}>Low</option>
+                            <option value="medium" {{if eq .Confidence "medium"}}selected{{end}}>Medium</option>
+                            <option value="high" {{if eq .Confidence "high"}}selected{{end}}>High</option>
+                        </select>
                     </div>
                 </div>
                 <div class="form-row-inline">
-                    <input type="text" name="work_description" class="input-box field-input-description" placeholder="What did you work on?" required>
-                    <button type="submit" class="btn-log">Log</button>
+                    <input type="text" name="note" class="input-box field-input-description" placeholder="What changed in your understanding?">
+                    <button type="submit" class="btn-log">Check In</button>
                 </div>
                 <div class="form-more-toggle" _="
                     on click
@@ -82,8 +86,17 @@
             </form>
 
             <div class="work-log-list">
-                {{range .WorkLogs}}
-                {{template "work_log_entry" .}}
+                {{range .ProjectLogs}}
+                {{template "project_log_entry" .}}
+                {{end}}
+            </div>
+        </div>
+
+        <div class="work-log-section">
+            <h3 class="section-title">Recent Task Work</h3>
+            <div class="work-log-list">
+                {{range .TaskLogs}}
+                {{template "task_log_entry" .}}
                 {{end}}
             </div>
         </div>
@@ -99,15 +112,28 @@
             <div class="field-value">{{if .Description}}{{.Description}}{{else}}<em>No description</em>{{end}}</div>
         </div>
         <div class="form-field">
-            <label class="field-label">Completion</label>
+            <label class="field-label">Status Estimate</label>
             <div class="field-value">{{.Completion}}%</div>
+        </div>
+        <div class="form-field">
+            <label class="field-label">Confidence</label>
+            <div class="field-value">{{.Confidence}}</div>
         </div>
 
         <div class="work-log-section">
-            <h3 class="section-title">Work Log</h3>
+            <h3 class="section-title">Project Check-Ins</h3>
             <div class="work-log-list">
-                {{range .WorkLogs}}
-                {{template "work_log_entry" .}}
+                {{range .ProjectLogs}}
+                {{template "project_log_entry" .}}
+                {{end}}
+            </div>
+        </div>
+
+        <div class="work-log-section">
+            <h3 class="section-title">Recent Task Work</h3>
+            <div class="work-log-list">
+                {{range .TaskLogs}}
+                {{template "task_log_entry" .}}
                 {{end}}
             </div>
         </div>
