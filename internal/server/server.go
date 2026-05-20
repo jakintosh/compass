@@ -24,17 +24,18 @@ import (
 )
 
 type Options struct {
-	Addr              string
-	DataDir           string
-	Dev               bool
-	ConsentURL        string
-	ConsentPubkeyFile string
-	IntegrationName   string
-	PublicURL         string
+	Addr            string
+	ConfigDir       string
+	DataDir         string
+	Dev             bool
+	ConsentURL      string
+	IntegrationName string
+	PublicURL       string
 }
 
 const (
-	databaseFilename = "compass.db"
+	databaseFilename        = "compass.db"
+	verificationKeyFilename = "verification_key"
 )
 
 type productionAppConfig struct {
@@ -188,9 +189,8 @@ func buildProductionAuthConfig(
 	error,
 ) {
 	if opts.ConsentURL == "" ||
-		opts.ConsentPubkeyFile == "" ||
 		opts.PublicURL == "" {
-		return authConfig{}, fmt.Errorf("production mode requires --consent-url, --consent-pubkey-file, and --public-url")
+		return authConfig{}, fmt.Errorf("production mode requires --consent-url and --public-url")
 	}
 
 	pubKey, err := loadConsentPublicKey(opts)
@@ -349,9 +349,15 @@ func loadConsentPublicKey(
 	*ecdsa.PublicKey,
 	error,
 ) {
-	data, err := os.ReadFile(opts.ConsentPubkeyFile)
+	configDir := opts.ConfigDir
+	if configDir == "" {
+		configDir = "."
+	}
+	filename := filepath.Join(configDir, verificationKeyFilename)
+
+	data, err := os.ReadFile(filename)
 	if err != nil {
-		return nil, fmt.Errorf("read %s: %w", opts.ConsentPubkeyFile, err)
+		return nil, fmt.Errorf("read %s: %w", filename, err)
 	}
 	return parseDERPublicKey(data)
 }

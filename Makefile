@@ -7,6 +7,9 @@ BIN := $(BIN_DIR)/$(APP)
 HOST_DATA_DIR := ./data
 HOST_DATA_MOUNT := $(abspath $(HOST_DATA_DIR))
 CONTAINER_DATA_DIR := /app/data
+HOST_CONFIG_DIR := ./config
+HOST_CONFIG_MOUNT := $(abspath $(HOST_CONFIG_DIR))
+CONTAINER_CONFIG_DIR := /app/config
 
 HOST_PORT ?= 8080
 CONTAINER_PORT ?= 80
@@ -50,16 +53,17 @@ install:
 	$(GO) install ./cmd/$(APP)
 
 init:
-	mkdir -p $(HOST_DATA_DIR)
+	mkdir -p $(HOST_DATA_DIR) $(HOST_CONFIG_DIR)
 
 run: build init
 	$(DOCKER) run --rm -it \
 		-p $(HOST_PORT):$(CONTAINER_PORT) \
 		-v "$(HOST_DATA_MOUNT):$(CONTAINER_DATA_DIR)" \
-		$(IMAGE) serve --dev --addr :$(CONTAINER_PORT) --data-dir $(CONTAINER_DATA_DIR)
+		-v "$(HOST_CONFIG_MOUNT):$(CONTAINER_CONFIG_DIR)" \
+		$(IMAGE) serve --dev --addr :$(CONTAINER_PORT) --data-dir $(CONTAINER_DATA_DIR) --config-dir $(CONTAINER_CONFIG_DIR)
 
 clean:
 	rm -rf $(BIN_DIR)
 
 reset:
-	rm -rf $(HOST_DATA_DIR)
+	rm -rf $(HOST_DATA_DIR) $(HOST_CONFIG_DIR)

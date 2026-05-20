@@ -64,12 +64,13 @@ func TestLoadConsentPublicKeyFromDERFile(t *testing.T) {
 		t.Fatalf("marshal public key: %v", err)
 	}
 
-	filename := filepath.Join(t.TempDir(), "verification_key.der")
+	configDir := t.TempDir()
+	filename := filepath.Join(configDir, "verification_key")
 	if err := os.WriteFile(filename, der, 0o644); err != nil {
 		t.Fatalf("write DER file: %v", err)
 	}
 
-	got, err := loadConsentPublicKey(Options{ConsentPubkeyFile: filename})
+	got, err := loadConsentPublicKey(Options{ConfigDir: configDir})
 	if err != nil {
 		t.Fatalf("loadConsentPublicKey returned error: %v", err)
 	}

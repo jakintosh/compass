@@ -32,7 +32,7 @@ For local development without a Consent server, `make run` runs the Docker image
 in dev auth mode. To run the binary directly:
 
 ```bash
-go run ./cmd/compass serve --dev --data-dir ./data
+go run ./cmd/compass serve --dev --data-dir ./data --config-dir ./config
 ```
 
 For a production Consent integration, register this app from its well-known
@@ -41,23 +41,22 @@ start Compass with:
 
 ```bash
 CONSENT_URL=https://consent.example.com \
-CONSENT_PUBKEY_FILE=/path/to/consent/verification_key.der \
 PUBLIC_URL=https://your-compass-host \
 CONSENT_INTEGRATION=compass \
-go run ./cmd/compass serve
+go run ./cmd/compass serve --config-dir ./config
 ```
 
 The Docker image defaults to production mode on port 80 and stores runtime state
-in `/app/data`, so production containers can provide the same Consent settings
-through environment variables:
+in `/app/data`. It reads the Consent verification key from
+`/app/config/verification_key`, so production containers can mount a config
+directory and provide the other Consent settings through environment variables:
 
 ```bash
 docker run --rm \
   -p 8080:80 \
   -v "$PWD/data:/app/data" \
-  -v "/path/to/consent/verification_key.der:/run/secrets/verification_key.der:ro" \
+  -v "$PWD/config:/app/config:ro" \
   -e CONSENT_URL=https://consent.example.com \
-  -e CONSENT_PUBKEY_FILE=/run/secrets/verification_key.der \
   -e PUBLIC_URL=https://your-compass-host \
   -e CONSENT_INTEGRATION=compass \
   compass:latest
@@ -67,8 +66,8 @@ docker run --rm \
 audience. The login URL requests the `identity` and `profile` Consent scopes so
 Compass can cache each user's handle for tenant URLs like
 `https://your-compass-host/{handle}/`. The default integration name is
-`compass`. `CONSENT_PUBKEY_FILE` should point at Consent's generated
-`verification_key.der`.
+`compass`. The config directory must contain Consent's generated DER
+verification key as `verification_key`.
 
 ## Usage
 

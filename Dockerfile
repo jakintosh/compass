@@ -24,4 +24,4 @@ COPY internal/app/static /app/internal/app/static
 EXPOSE 80
 VOLUME ["/app/data"]
 ENTRYPOINT ["/app/compass"]
-CMD ["serve", "--addr", ":80", "--data-dir", "/app/data"]
+CMD ["serve", "--addr", ":80", "--data-dir", "/app/data", "--config-dir", "/app/config"]
